@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowUp, ChartNoAxesCombined, ClipboardList, FileText, List, Mic, ReceiptText, RotateCcw, Square, WalletCards } from "lucide-react";
 import { Popover } from "radix-ui";
+import { useStaticView } from "@/components/dashboard/view-mode";
 import { AssistantReply } from "./assistant-reply";
 import { examples, followUp } from "./examples";
 import { usePreviewConversation, type PreviewOutcome, type PreviewTurn } from "./preview-conversation";
@@ -20,6 +21,11 @@ function appendTranscript(draft: string, transcript: string) {
 }
 
 export function Assistant({ exampleId }: { exampleId?: string }) {
+  const isStaticView = useStaticView();
+  return <AssistantConversation key={isStaticView ? "static" : "dynamic"} isStaticView={isStaticView} exampleId={isStaticView ? exampleId : undefined} />;
+}
+
+function AssistantConversation({ exampleId, isStaticView }: { exampleId?: string; isStaticView: boolean }) {
   const [draft, setDraft] = useState(() => examples.find((example) => example.id === exampleId)?.question ?? "");
   const { turns, pending, begin, stop, clear } = usePreviewConversation();
   const [examplesOpen, setExamplesOpen] = useState(false);
@@ -66,7 +72,7 @@ export function Assistant({ exampleId }: { exampleId?: string }) {
 
   function send(value: string, outcome: PreviewOutcome = "normal") {
     const question = value.trim();
-    if (!question || value.length > draftLimit || voiceBusy || pending || !begin(question, outcome)) return;
+    if (!isStaticView || !question || value.length > draftLimit || voiceBusy || pending || !begin(question, outcome)) return;
 
     voice.cancel();
     if (examplesOpen) promptChosen.current = true;
@@ -96,7 +102,7 @@ export function Assistant({ exampleId }: { exampleId?: string }) {
   return (
     <section className="assistant-page" aria-labelledby="assistant-heading">
       <div className="assistant-session">
-        <span>Scripted preview</span>
+        <span>{isStaticView ? "Scripted preview" : "Dynamic View"}</span>
         {(hasConversation || draft || voiceBusy) && (
           <button className="assistant-tool" type="button" onClick={reset}><RotateCcw size={15} aria-hidden="true" /> Clear conversation</button>
         )}
@@ -108,12 +114,12 @@ export function Assistant({ exampleId }: { exampleId?: string }) {
           <h1 id="assistant-heading">Working capital, explained.</h1>
           {!hasConversation && (
             <>
-              <p>Ask about balances, payments, or the records behind them.</p>
+              <p>{isStaticView ? "Ask about balances, payments, or the records behind them." : "The live Assistant will be available once financial data is connected."}</p>
               <div className="assistant-prompts" aria-label="Suggested questions">
                 {suggestions.map(({ id, label, icon: Icon }) => {
                   const example = examples.find((entry) => entry.id === id);
                   return example && (
-                    <button key={id} type="button" onClick={() => choosePrompt(example.question)}>
+                    <button key={id} type="button" disabled={!isStaticView} onClick={() => choosePrompt(example.question)}>
                       <span><Icon size={16} aria-hidden="true" /></span>{label}
                     </button>
                   );
@@ -163,7 +169,7 @@ export function Assistant({ exampleId }: { exampleId?: string }) {
             }} />
           <div className="composer-tools">
             <Popover.Root open={examplesOpen} onOpenChange={setExamplesOpen}>
-              <Popover.Trigger className="assistant-tool" type="button"><List size={17} aria-hidden="true" /> Examples</Popover.Trigger>
+              <Popover.Trigger className="assistant-tool" type="button" disabled={!isStaticView}><List size={17} aria-hidden="true" /> Examples</Popover.Trigger>
               <Popover.Portal>
                 <Popover.Content align="start" side="top" sideOffset={8} className="assistant-example-menu" aria-label="Example questions" onCloseAutoFocus={(event) => {
                   if (!promptChosen.current) return;
@@ -192,7 +198,7 @@ export function Assistant({ exampleId }: { exampleId?: string }) {
               )}
               <button className="assistant-tool voice-button" type="button" aria-label={recording ? "Stop voice dictation" : "Start voice dictation"}
                 aria-pressed={recording} title={recording ? "Stop dictation" : "Start dictation"}
-                onClick={voice.toggle} disabled={voice.phase === "finishing"}>
+                onClick={voice.toggle} disabled={!isStaticView || voice.phase === "finishing"}>
                 {recording ? <Square size={15} aria-hidden="true" /> : <Mic size={19} aria-hidden="true" />}
               </button>
               {pending ? (
@@ -200,7 +206,7 @@ export function Assistant({ exampleId }: { exampleId?: string }) {
                   <Square size={16} aria-hidden="true" />
                 </button>
               ) : (
-                <button className="assistant-send" type="submit" disabled={!draft.trim() || voiceBusy || draftTooLong} aria-label="Send question">
+                <button className="assistant-send" type="submit" disabled={!isStaticView || !draft.trim() || voiceBusy || draftTooLong} aria-label="Send question">
                   <ArrowUp size={19} aria-hidden="true" />
                 </button>
               )}

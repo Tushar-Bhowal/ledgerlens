@@ -3,6 +3,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowDownUp, ArrowUp, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, EllipsisVertical, Inbox, RotateCcw, Search, SearchX, Settings, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import { DropdownMenu, Popover } from "radix-ui";
+import { useStaticView } from "@/components/dashboard/view-mode";
 import { CountUp } from "./count-up";
 import { StateMessage } from "./state-message";
 
@@ -78,7 +79,7 @@ function RowActions({ label, actions }: { label: string; actions: readonly Table
 
 export function DataTable<Row>({
   label,
-  rows,
+  rows: previewRows,
   getRowKey,
   columns,
   search,
@@ -91,6 +92,8 @@ export function DataTable<Row>({
   rowActions,
   density = "comfortable",
 }: DataTableProps<Row>) {
+  const isStaticView = useStaticView();
+  const rows = isStaticView ? previewRows : [];
   const [query, setQuery] = useState("");
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [sort, setSort] = useState(defaultSort);
@@ -100,7 +103,7 @@ export function DataTable<Row>({
   const filterTrigger = useRef<HTMLButtonElement>(null);
   const [selectedKeys, setSelectedKeys] = useState<ReadonlySet<string>>(() => new Set());
   const sortableColumns = columns.filter((column) => column.compare);
-  const activeFilters = filters.filter((filter) => selections[filter.id]).length;
+  const activeFilters = filters.filter((filter) => filter.options.some((option) => option.value === selections[filter.id])).length;
   const term = query.trim().toLowerCase();
   const matching = rows.filter((row) => {
     if (search && term && !search.getText(row).toLowerCase().includes(term)) return false;
@@ -195,7 +198,7 @@ export function DataTable<Row>({
               <Popover.Portal>
                 <Popover.Content className="table-popup" aria-label="Filter table" align="start" sideOffset={6}>
                   {filters.map((filter) => {
-                    const value = selections[filter.id] ?? "";
+                    const value = filter.options.some((option) => option.value === selections[filter.id]) ? selections[filter.id] : "";
                     const options = [{ value: "", label: filter.allLabel }, ...filter.options];
                     return filter.display === "buttons" ? (
                       <fieldset key={filter.id} className="table-popup-group">
@@ -282,9 +285,9 @@ export function DataTable<Row>({
         <StateMessage
           compact
           heading="h3"
-          icon={term || activeFilters > 0 ? SearchX : Inbox}
-          title={term || activeFilters > 0 ? "No matching records" : "No records in this view"}
-          description={emptyMessage ?? (term || activeFilters > 0 ? "Try a different search or clear your filters to see more records." : "Records will appear here when they are available.")}
+          icon={isStaticView && (term || activeFilters > 0) ? SearchX : Inbox}
+          title={isStaticView && (term || activeFilters > 0) ? "No matching records" : "No records in this view"}
+          description={isStaticView ? emptyMessage ?? (term || activeFilters > 0 ? "Try a different search or clear your filters to see more records." : "Records will appear here when they are available.") : "Live records will appear here when available."}
         >
           {(term || activeFilters > 0) && <button type="button" className="table-tool-button" onClick={() => { setQuery(""); setSelections({}); setPage(0); (searchInput.current ?? filterTrigger.current)?.focus(); }}><RotateCcw size={16} aria-hidden="true" /> Clear search and filters</button>}
         </StateMessage>

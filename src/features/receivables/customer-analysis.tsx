@@ -5,11 +5,13 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { EvidenceDrawer } from "@/components/dashboard/evidence-drawer";
+import { useStaticView } from "@/components/dashboard/view-mode";
 import { collectionPriorities } from "@/features/finance/preview-selectors";
 import { financePreview, percent } from "@/features/finance/preview-data";
 import { money } from "@/lib/demo-data";
 
 export function CustomerAnalysis({ customerId }: { customerId?: string }) {
+  const isStaticView = useStaticView();
   const [selected, setSelected] = useState(() => financePreview.customers.find((row) => row.id === customerId) ?? null);
   const customers = collectionPriorities;
   const documents = selected ? financePreview.invoices.filter((row) => row.partyId === selected.id && row.outstanding > 0).sort((a, b) => a.due.localeCompare(b.due)) : [];
@@ -17,7 +19,7 @@ export function CustomerAnalysis({ customerId }: { customerId?: string }) {
   return (
     <>
       <section className="panel finance-panel">
-        <header className="finance-panel-heading"><div><h2>Customer collection priorities</h2><p>Past-due exposure, current limits and source follow-ups · 31 Dec 2025</p></div></header>
+        <header className="finance-panel-heading"><div><h2>Customer collection priorities</h2><p>Past-due exposure, current limits and source follow-ups{isStaticView && " · 31 Dec 2025"}</p></div></header>
         <p className="footnote">High priority means over-90-day overdue exposure, a breached current limit, or a valid broken promise. Within the group, actionable overdue and oldest due date determine order. Resolve disputes before chasing the disputed portion.</p>
         <DataTable label="Customer priorities" rows={customers} getRowKey={(row) => row.id} getRowLabel={(row) => row.name}
           rowActions={(row) => [{ label: "Review customer", onSelect: () => setSelected(row) }]}
@@ -35,7 +37,7 @@ export function CustomerAnalysis({ customerId }: { customerId?: string }) {
           search={{ label: "Search customers", placeholder: "Search customer or group", getText: (row) => `${row.name} ${row.id} ${row.group}` }}
           filters={[
             { id: "priority", label: "Priority", allLabel: "All priorities", options: ["High", "Review", "Monitor"].map((value) => ({ value, label: value })), getValue: (row) => row.risk },
-            { id: "region", label: "Region", allLabel: "All regions", options: [...new Set(customers.map((row) => row.region))].map((value) => ({ value, label: value })), getValue: (row) => row.region },
+            { id: "region", label: "Region", allLabel: "All regions", options: isStaticView ? [...new Set(customers.map((row) => row.region))].map((value) => ({ value, label: value })) : [], getValue: (row) => row.region },
           ]} pageSize={8} />
       </section>
       {selected && (

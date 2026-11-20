@@ -315,6 +315,7 @@
 }
 
 .topbar-start { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.topbar-end { display: flex; flex: none; align-items: center; gap: 10px; }
 
 .dashboard-menu-button {
   display: grid;
@@ -712,6 +713,7 @@ select option { color: var(--foreground); background: var(--popover); }
 
 .assistant-prompts button > span { display: grid; place-items: center; width: 29px; height: 29px; color: var(--accent-foreground); background: var(--chat-accent-surface); border-radius: 6px; }
 .assistant-prompts button:hover:not(:disabled), .assistant-tool:hover:not(:disabled), .assistant-example-menu button:hover:not(:disabled) { background: var(--button-surface-hover); border-color: var(--primary); }
+.assistant-prompts button:disabled, .assistant-tool:disabled { opacity: .45; cursor: default; }
 .evidence-link:hover { background: var(--button-surface); border-color: var(--button-border); }
 .conversation-log { width: min(100%, 780px); margin-inline: auto; }
 .conversation-log:not(:empty) { display: grid; gap: 25px; padding: 18px var(--assistant-gutter) 20px; }
@@ -963,6 +965,7 @@ select option { color: var(--foreground); background: var(--popover); }
 .trend-y-axis { display: flex; flex-direction: column; justify-content: space-between; margin-block: -7px; }
 .trend-y-axis, .trend-x-axis { color: var(--muted-foreground); font-size: 11px; line-height: 14px; }
 .trend-canvas { position: relative; min-width: 0; }
+.trend-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted-foreground); font-size: 13px; text-align: center; }
 .trend-svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .trend-gridline { stroke: var(--surface-line); stroke-width: 1; }
 .trend-marker { stroke: var(--muted-foreground); stroke-width: 1; stroke-dasharray: 3 4; }
@@ -1023,6 +1026,7 @@ select option { color: var(--foreground); background: var(--popover); }
 .ageing-amount { font-size: clamp(14px, 1.65vw, 21px); font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.035em; }
 .ageing-share { margin-top: 9px; color: var(--muted-foreground); font-size: 12px; font-variant-numeric: tabular-nums; }
 .ageing-bar { grid-template-columns: var(--ageing-columns); height: 7px; }
+.ageing-bar[data-empty] { border-radius: 2px; background: var(--muted); }
 .ageing-bar span { border-radius: 2px; background: var(--ageing-accent); }
 [data-ageing-group="current"] { --ageing-accent: color-mix(in oklch, var(--muted-foreground) 70%, var(--card)); }
 [data-ageing-group="overdue"] { --ageing-accent: var(--chart-1); }
@@ -1075,6 +1079,9 @@ select option { color: var(--foreground); background: var(--popover); }
 }
 
 @media (max-width: 480px) {
+  .topbar-end { gap: 6px; }
+  .snapshot { font-size: 12px; }
+  .snapshot > svg { display: none; }
   .overview-board { --overview-gutter: 12px; }
   .overview-section { padding-block: 14px; }
   .trend-readout { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 12px; }

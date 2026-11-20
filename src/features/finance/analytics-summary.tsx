@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { StaticPreview } from "@/components/dashboard/view-mode";
 import { StatCard } from "@/components/ui/stat-card";
 import { days, financePreview, percent } from "./preview-data";
 import { concentrations } from "./preview-selectors";
@@ -23,22 +24,22 @@ export function AnalyticsSummary({ ledger }: { ledger: "ar" | "ap" }) {
         <StatCard label={ledger === "ar" ? "DSO estimate" : "Purchase-based DPO proxy"} value={days(metrics.proxyDays)} caption="2025 supplied ledger estimate" />
         <StatCard label="Actual settlement days" value={days(metrics.elapsedDays)} caption="Amount-weighted elapsed days" />
       </div>
-      <p className="footnote">2025 measures use mean daily balance ÷ net document-date billing × 365. Settlement days weight each allocated portion from the original document date. The AP proxy uses purchases because COGS is absent.</p>
+      <StaticPreview><p className="footnote">2025 measures use mean daily balance ÷ net document-date billing × 365. Settlement days weight each allocated portion from the original document date. The AP proxy uses purchases because COGS is absent.</p></StaticPreview>
       <div className="finance-two-column">
-        <div><h3>Largest party concentrations</h3><ol className="concentration-list">{parties.map((item) => <li key={item.id}><div>{ledger === "ar" ? <Link className="text-link" href={`/receivables?customer=${item.id}`}>{item.party}</Link> : item.party}<strong>{percent(item.amount / total)}</strong></div><span>{money(item.amount)}</span></li>)}</ol></div>
-        <div><h3>Allocated cash against due date</h3><dl className="detail-list">{metrics.patterns.map((item) => <div key={item.label}><dt>{item.label}</dt><dd>{money(item.amount)}</dd></div>)}</dl><p className="footnote">Amounts apply only to settled portions. Open balances do not enter this distribution.</p></div>
+        <div><h3>Largest party concentrations</h3><StaticPreview fallback={<p className="footnote">No live party balances yet.</p>}><ol className="concentration-list">{parties.map((item) => <li key={item.id}><div>{ledger === "ar" ? <Link className="text-link" href={`/receivables?customer=${item.id}`}>{item.party}</Link> : item.party}<strong>{percent(item.amount / total)}</strong></div><span>{money(item.amount)}</span></li>)}</ol></StaticPreview></div>
+        <div><h3>Allocated cash against due date</h3><dl className="detail-list">{metrics.patterns.map((item) => <div key={item.label}><dt>{item.label}</dt><dd><StaticPreview fallback="—">{money(item.amount)}</StaticPreview></dd></div>)}</dl><p className="footnote">Amounts apply only to settled portions. Open balances do not enter this distribution.</p></div>
       </div>
       <h3>Group concentration</h3>
       <p className="footnote">Members of the same source group are combined. The denominator is all positive outstanding in this ledger.</p>
       <div className="group-concentration-list">
-        {concentrations(ledger).map((group) => (
+        <StaticPreview fallback={<p className="footnote">No live group balances yet.</p>}>{concentrations(ledger).map((group) => (
           <details key={group.name}>
             <summary><span>{group.name}</span><strong>{money(group.amount)} · {percent(group.share)}</strong></summary>
             <ul>{group.members.map((member) => <li key={member.id}><Link className="text-link" href={ledger === "ar" ? `/receivables?customer=${member.id}` : `/payables?vendor=${member.id}`}>{member.name}</Link></li>)}</ul>
           </details>
-        ))}
+        ))}</StaticPreview>
       </div>
-      <details className="coverage-details"><summary>Source coverage and unavailable metrics</summary><p>Inventory, bank statements, GL and COGS are absent. Inventory days, full cash conversion cycle and bank/GL reconciliation are unavailable. Customer credit limits are current values, with no historical change register. This preview gives no legal recovery conclusion.</p></details>
+      <details className="coverage-details"><summary>Source coverage and unavailable metrics</summary><p><StaticPreview fallback="Live source coverage will be available once financial data is connected.">Inventory, bank statements, GL and COGS are absent. Inventory days, full cash conversion cycle and bank/GL reconciliation are unavailable. Customer credit limits are current values, with no historical change register. This preview gives no legal recovery conclusion.</StaticPreview></p></details>
     </section>
   );
 }

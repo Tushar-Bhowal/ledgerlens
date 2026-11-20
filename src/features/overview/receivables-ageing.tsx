@@ -1,5 +1,8 @@
+"use client";
+
 import { ChevronDown } from "lucide-react";
 import type { CSSProperties } from "react";
+import { useStaticView } from "@/components/dashboard/view-mode";
 import { CountUp } from "@/components/ui/count-up";
 import { money, receivableAgeing, rupeesPerCrore } from "@/lib/demo-data";
 
@@ -14,6 +17,7 @@ const groups = [
 const total = groups.reduce((sum, group) => sum + group.amount, 0);
 const columns = groups.map(({ amount }) => `minmax(0, ${amount / total}fr)`).join(" ");
 export function ReceivablesAgeing() {
+  const isStaticView = useStaticView();
   return (
     <section className="overview-section ageing-summary" aria-labelledby="ageing-title">
       <div className="overview-section-heading">
@@ -23,21 +27,21 @@ export function ReceivablesAgeing() {
         </div>
         <div className="ageing-total">
           <span>Total outstanding</span>
-          <strong><CountUp value={total / rupeesPerCrore} format="crore" /></strong>
+          <strong>{isStaticView ? <CountUp value={total / rupeesPerCrore} format="crore" /> : "—"}</strong>
         </div>
       </div>
-      <div className="ageing-distribution" style={{ "--ageing-columns": columns } as CSSProperties}>
+      <div className="ageing-distribution" style={{ "--ageing-columns": isStaticView ? columns : "repeat(3, minmax(0, 1fr))" } as CSSProperties}>
         <dl className="ageing-groups">
           {groups.map(({ id, label, amount }) => (
             <div className="ageing-group" data-ageing-group={id} key={id}>
               <dt><span className="ageing-swatch" aria-hidden="true" />{label}</dt>
-              <dd className="ageing-amount"><CountUp value={amount / rupeesPerCrore} format="crore" /></dd>
-              <dd className="ageing-share"><CountUp value={amount / total} format="percent" /><span className="sr-only"> of total outstanding</span></dd>
+              <dd className="ageing-amount">{isStaticView ? <CountUp value={amount / rupeesPerCrore} format="crore" /> : "—"}</dd>
+              <dd className="ageing-share">{isStaticView ? <><CountUp value={amount / total} format="percent" /><span className="sr-only"> of total outstanding</span></> : "—"}</dd>
             </div>
           ))}
         </dl>
-        <div className="ageing-bar" aria-hidden="true">
-          {groups.map(({ id }) => <span key={id} data-ageing-group={id} />)}
+        <div className="ageing-bar" data-empty={!isStaticView || undefined} aria-hidden="true">
+          {isStaticView && groups.map(({ id }) => <span key={id} data-ageing-group={id} />)}
         </div>
       </div>
       <details className="ageing-details">
@@ -46,7 +50,7 @@ export function ReceivablesAgeing() {
           {receivableAgeing.map(({ label, amount }) => (
             <div key={label}>
               <dt>{label}</dt>
-              <dd>{money(amount)}</dd>
+              <dd>{isStaticView ? money(amount) : "—"}</dd>
             </div>
           ))}
         </dl>

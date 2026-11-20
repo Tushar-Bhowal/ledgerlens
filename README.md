@@ -6,7 +6,7 @@ A DDL Labs assignment application for accounts receivable, accounts payable and 
 
 The six dashboard screens and shared design components are implemented as a static preview. They include reusable tables and stats, chart and number animations, route skeletons, source-record panels, and a scripted Assistant. Neon is connected through the database health endpoint.
 
-**Static frontend implementation is complete against the current plan; final UI approval is pending.** Detailed customer risk and collections, configurable AR/AP ageing, period movements and due cohorts, AP settlement and payment review, and measures are implemented against a prepared source snapshot. All six scripted Assistant answers include fuller findings, tables and links. Group concentration, ageing-bucket changes, a labelled three-month-based balance illustration and unique-invoice collection opportunities are available. Collection and disputed portions appear separately. Browser/mobile and microphone verification are deferred. Financial schema/import, business APIs, live AI and delivery artifacts remain later stages.
+**The user approved the static UI.** Detailed customer risk and collections, configurable AR/AP ageing, period movements and due cohorts, AP settlement and payment review, and measures are implemented against a prepared source snapshot. All six scripted Assistant answers include fuller findings, tables and links. Group concentration, ageing-bucket changes, a labelled three-month-based balance illustration and unique-invoice collection opportunities are available. Collection and disputed portions appear separately. Browser, mobile, keyboard and microphone verification are deferred. Financial schema/import, business APIs, live AI and delivery artifacts remain later stages.
 
 The supplied dataset uses INR and a reporting date of **31 December 2025**. Place the original starter pack at `DDL_Labs_WC_Starter_Data/` before the later import stage. The data folder is excluded from Git and must be supplied separately with the submission.
 
@@ -22,6 +22,8 @@ npm run dev
 Open [localhost:3000](http://localhost:3000). The static dashboard runs without credentials. The database endpoint needs a PostgreSQL connection as described below.
 
 ## Static dashboard preview
+
+The top bar defaults to **Static View**, which shows the prepared data and its reporting date. **Dynamic View** keeps the same page layouts, cards, charts, tables, tabs and Assistant composer visible with empty data states. The selection carries across dashboard pages and resets to Static View on reload.
 
 The overview, receivables, payables, risk and exceptions, action queue and assistant pages show a preview of the planned experience. The sample tables support search, sorting, pagination and source-record details; the assistant offers scripted examples and does not call an AI model. The displayed portfolio figures describe the supplied snapshot, and finance tables use a prepared snapshot of all eligible source documents. No business data is fetched from the database yet.
 

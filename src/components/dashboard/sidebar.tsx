@@ -7,7 +7,12 @@ import Link from "next/link";
 import { Dialog } from "radix-ui";
 import { dashboardNavigation } from "./navigation";
 
-export function Sidebar({ open, pathname, onNavigate }: { open: boolean; pathname: string; onNavigate: () => void }) {
+export function Sidebar({ open, pathname, onNavigate, showSnapshot }: {
+  open: boolean;
+  pathname: string;
+  onNavigate: () => void;
+  showSnapshot: boolean;
+}) {
   const reduceMotion = useReducedMotion();
   const slide = { x: reduceMotion ? 0 : "-100%" };
   const transition = { duration: reduceMotion ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] as const };
@@ -44,7 +49,7 @@ export function Sidebar({ open, pathname, onNavigate }: { open: boolean; pathnam
                     </Link>
                   ))}
                 </nav>
-                <div className="source-note"><span>Starter dataset</span><span>INR</span></div>
+                {showSnapshot && <div className="source-note"><span>Starter dataset</span><span>INR</span></div>}
               </m.aside>
             </Dialog.Content>
           </Dialog.Portal>

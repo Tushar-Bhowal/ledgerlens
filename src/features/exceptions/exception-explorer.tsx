@@ -5,10 +5,12 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { EvidenceDrawer } from "@/components/dashboard/evidence-drawer";
+import { useStaticView } from "@/components/dashboard/view-mode";
 import { financePreview } from "@/features/finance/preview-data";
 import { money } from "@/lib/demo-data";
 
 export function ExceptionExplorer({ issueId }: { issueId?: string }) {
+  const isStaticView = useStaticView();
   const [selected, setSelected] = useState(() => (financePreview.issues.find((row) => row.id === issueId) ?? financePreview.issues.find((row) => row.evidence.includes(issueId ?? ""))) ?? null);
   const issues = financePreview.issues;
   return (
@@ -28,7 +30,7 @@ export function ExceptionExplorer({ issueId }: { issueId?: string }) {
           ]}
           search={{ label: "Search investigations", placeholder: "Search party, source or reason", getText: (row) => `${row.party} ${row.id} ${row.evidence.join(" ")} ${row.reason}` }}
           filters={[
-            { id: "kind", label: "Issue type", allLabel: "All types", options: [...new Set(issues.map((row) => row.kind))].map((value) => ({ value, label: value })), getValue: (row) => row.kind },
+            { id: "kind", label: "Issue type", allLabel: "All types", options: isStaticView ? [...new Set(issues.map((row) => row.kind))].map((value) => ({ value, label: value })) : [], getValue: (row) => row.kind },
             { id: "severity", label: "Severity", allLabel: "All severities", options: ["High", "Review", "Info"].map((value) => ({ value, label: value })), getValue: (row) => row.severity },
           ]} pageSize={8} />
       </section>

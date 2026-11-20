@@ -4,11 +4,13 @@ import { useId, useRef, useState, type ReactNode } from "react";
 import { CircleAlert, FileQuestion, Inbox, RotateCcw } from "lucide-react";
 import { DataTableSkeleton, Skeleton } from "@/components/ui/loading-skeletons";
 import { StateMessage } from "@/components/ui/state-message";
+import { useStaticView } from "@/components/dashboard/view-mode";
 
 type View = { id: string; label: string; content: ReactNode };
 type State = "ready" | "loading" | "empty" | "error" | "unavailable";
 
 export function FinanceDashboard({ label, views, initialView }: { label: string; views: readonly View[]; initialView?: string }) {
+  const isStaticView = useStaticView();
   const [active, setActive] = useState(initialView ?? views[0].id);
   const [state, setState] = useState<State>("ready");
   const prefix = useId();
@@ -25,7 +27,7 @@ export function FinanceDashboard({ label, views, initialView }: { label: string;
         </div>
         <label className="preview-state-select">
           Preview state
-          <select ref={stateSelect} value={state} onChange={(event) => setState(event.target.value as State)}>
+          <select ref={stateSelect} value={isStaticView ? state : "unavailable"} disabled={!isStaticView} onChange={(event) => setState(event.target.value as State)}>
             <option value="ready">Ready</option>
             <option value="loading">Loading</option>
             <option value="empty">Empty</option>
@@ -35,7 +37,7 @@ export function FinanceDashboard({ label, views, initialView }: { label: string;
         </label>
       </div>
       <div id={prefix} role="region" aria-label={selected.label}>
-        {state === "ready" ? selected.content : state === "loading" ? (
+        {!isStaticView || state === "ready" ? selected.content : state === "loading" ? (
           <section className="panel finance-panel">
             <span className="sr-only" role="status">Loading {selected.label}</span>
             <div aria-hidden="true"><Skeleton className="skeleton-title" /><DataTableSkeleton columns={5} rows={5} /></div>

@@ -1,12 +1,11 @@
 import type { ReactNode } from "react";
-import { DashboardNavigation } from "@/components/dashboard/dashboard-navigation";
+import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
       <div className="dashboard">
-        <DashboardNavigation />
-        <main className="dashboard-main">{children}</main>
+        <DashboardShell>{children}</DashboardShell>
       </div>
     </div>
   );

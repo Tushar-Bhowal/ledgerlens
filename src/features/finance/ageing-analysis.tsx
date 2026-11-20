@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useStaticView } from "@/components/dashboard/view-mode";
 import { DataTable } from "@/components/ui/data-table";
 import { money, reportingDate } from "@/lib/demo-data";
 import { financePreview } from "./preview-data";
@@ -9,12 +10,13 @@ type Basis = "due" | "date";
 const daysApart = (end: string, start: string) => Math.floor((Date.parse(end) - Date.parse(start)) / 86_400_000);
 
 export function AgeingAnalysis({ ledger }: { ledger: "ar" | "ap" }) {
+  const isStaticView = useStaticView();
   const [basis, setBasis] = useState<Basis>("due");
   const [boundaries, setBoundaries] = useState([30, 60, 90]);
   const [draft, setDraft] = useState(["30", "60", "90"]);
   const [error, setError] = useState("");
   const documents = ledger === "ar" ? financePreview.invoices : financePreview.bills;
-  const positive = documents.filter((row) => row.outstanding > 0);
+  const positive = isStaticView ? documents.filter((row) => row.outstanding > 0) : [];
   const total = positive.reduce((sum, row) => sum + row.outstanding, 0);
   const groups = [
     { label: basis === "due" ? "Current" : "0 days", amount: 0 },
@@ -41,7 +43,7 @@ export function AgeingAnalysis({ ledger }: { ledger: "ar" | "ap" }) {
 
   return (
     <section className="panel finance-panel">
-      <header className="finance-panel-heading"><div><h2>{ledger === "ar" ? "Receivable" : "Payable"} ageing</h2><p>Positive balances as of 31 Dec 2025</p></div></header>
+      <header className="finance-panel-heading"><div><h2>{ledger === "ar" ? "Receivable" : "Payable"} ageing</h2><p>Positive balances{isStaticView && " as of 31 Dec 2025"}</p></div></header>
       <div className="finance-controls">
         <label>Ageing basis<select value={basis} onChange={(event) => setBasis(event.target.value as Basis)}><option value="due">Due date</option><option value="date">Original document date</option></select></label>
         <form onSubmit={(event) => { event.preventDefault(); apply(); }} className="bucket-form">
@@ -51,7 +53,7 @@ export function AgeingAnalysis({ ledger }: { ledger: "ar" | "ap" }) {
       </div>
       {error && <p className="finance-validation" role="alert">{error}</p>}
       <div className="finance-bar-list">
-        {groups.map((group) => <div key={group.label}><span>{group.label}</span><strong>{money(group.amount)}</strong><div className="finance-bar-track" aria-hidden="true"><span style={{ width: `${total ? group.amount / total * 100 : 0}%` }} /></div></div>)}
+        {groups.map((group) => <div key={group.label}><span>{group.label}</span><strong>{isStaticView ? money(group.amount) : "—"}</strong><div className="finance-bar-track" aria-hidden="true"><span style={{ width: `${total ? group.amount / total * 100 : 0}%` }} /></div></div>)}
       </div>
       <DataTable label="Ageing source documents" rows={positive} getRowKey={(row) => row.id} columns={[
         { id: "id", label: "Source", cell: (row) => <a className="text-link" href={`/${ledger === "ar" ? "receivables?invoice" : "payables?bill"}=${row.id}`}>{row.number}</a> },

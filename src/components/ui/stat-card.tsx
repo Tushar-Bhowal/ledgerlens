@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { CountUp, type CountFormat } from "./count-up";
+import { StaticPreview } from "@/components/dashboard/view-mode";
 
 type StatCardProps = {
   label: string;
@@ -19,8 +20,8 @@ export function StatCard({ label, value, format, caption, icon: Icon, attention 
         <span>{label}</span>
         {Icon && <Icon size={15} aria-hidden="true" />}
       </div>
-      <strong className="stat-value">{typeof value === "number" ? <CountUp value={value} format={format} /> : value}</strong>
-      {caption && <p className="stat-caption">{caption}</p>}
+      <strong className="stat-value"><StaticPreview fallback="—">{typeof value === "number" ? <CountUp value={value} format={format} /> : value}</StaticPreview></strong>
+      {caption && <StaticPreview><p className="stat-caption">{caption}</p></StaticPreview>}
       {chart && <div className="stat-chart">{chart}</div>}
     </article>
   );

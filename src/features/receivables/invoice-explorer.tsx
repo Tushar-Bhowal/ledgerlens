@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { ArrowRight, BadgeIndianRupee, CalendarDays, Check, CircleAlert, Clock3, FileText, WalletCards } from "lucide-react";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { StaticPreview } from "@/components/dashboard/view-mode";
 import { financePreview, type FinanceDocument } from "@/features/finance/preview-data";
 import { DocumentEvidence } from "@/features/finance/document-evidence";
 import { money, reportingDate } from "@/lib/demo-data";
@@ -34,7 +35,7 @@ export function InvoiceExplorer({ invoiceId, compact = false, customerId }: { in
   return (
     <>
       <section className={compact ? "overview-section invoice-dashboard" : "panel data-panel invoice-dashboard"}>
-        <div className="overview-section-heading"><div><h2>Customer invoices</h2><p>{rows.length} source records · Prepared preview</p></div>{compact && <Link className="text-link" href="/receivables">Receivables <ArrowRight size={15} /></Link>}</div>
+        <div className="overview-section-heading"><div><h2>Customer invoices</h2><StaticPreview><p>{rows.length} source records · Prepared preview</p></StaticPreview></div>{compact && <Link className="text-link" href="/receivables">Receivables <ArrowRight size={15} /></Link>}</div>
         <DataTable label="Customer invoices" rows={rows} columns={columns} selectable getRowKey={(row) => row.id} getRowLabel={(row) => row.number}
           rowActions={(row) => [{ label: "View evidence", onSelect: () => setSelected(row) }]}
           search={{ label: "Search invoices", placeholder: "Search invoices", getText: (row) => `${row.party} ${row.number} ${row.id}` }}

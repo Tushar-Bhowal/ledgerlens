@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { StaticPreview } from "@/components/dashboard/view-mode";
 import { DataTable } from "@/components/ui/data-table";
 import { StatCard } from "@/components/ui/stat-card";
 import { money } from "@/lib/demo-data";
@@ -10,7 +11,7 @@ import { opportunityTotals, overdueDocuments, totalAmount } from "./preview-sele
 export function Opportunities() {
   return (
     <section className="panel finance-panel">
-      <header className="finance-panel-heading"><div><h2>Collection opportunities</h2><p>Unique overdue invoices · 31 Dec 2025</p></div></header>
+      <header className="finance-panel-heading"><div><h2>Collection opportunities</h2><p>Unique overdue invoices<StaticPreview> · 31 Dec 2025</StaticPreview></p></div></header>
       <div className="stat-strip">
         <StatCard label="Actionable overdue" value={opportunityTotals.actionable} format="rupees" caption="After unresolved disputed portions" />
         <StatCard label="Disputed overdue" value={opportunityTotals.disputed} format="rupees" caption="Capped at each invoice’s open amount" attention />
@@ -29,7 +30,7 @@ export function Opportunities() {
         ]}
         search={{ label: "Search opportunities", placeholder: "Search customer or invoice", getText: (row) => `${row.party} ${row.id} ${row.number}` }}
         defaultSort={{ columnId: "actionable", direction: "descending" }} pageSize={8} />
-      <h3>Unallocated receipts · {money(totalAmount(financePreview.unallocated.map((row) => row.amount)))}</h3>
+      <h3>Unallocated receipts<StaticPreview> · {money(totalAmount(financePreview.unallocated.map((row) => row.amount)))}</StaticPreview></h3>
       <p className="footnote">This cash has already been received. It is an allocation task and stays outside the collection opportunity total.</p>
       <DataTable label="Unallocated receipt review" rows={financePreview.unallocated} getRowKey={(row) => row.id} columns={[
         { id: "receipt", label: "Receipt", cell: (row) => <Link className="text-link" href={`/exceptions?issue=${row.id}`}>{row.id}</Link> },

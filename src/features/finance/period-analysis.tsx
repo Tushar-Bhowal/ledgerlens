@@ -2,35 +2,37 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useStaticView } from "@/components/dashboard/view-mode";
 import { DataTable } from "@/components/ui/data-table";
 import { money } from "@/lib/demo-data";
 import { ageingMovement, dueCohort, projectionIllustration } from "./preview-selectors";
 import { financePreview } from "./preview-data";
 
 export function PeriodAnalysis({ ledger }: { ledger: "ar" | "ap" }) {
-  const periods = financePreview.periods[ledger];
+  const isStaticView = useStaticView();
+  const periods = isStaticView ? financePreview.periods[ledger] : [];
   const [month, setMonth] = useState(11);
-  const row = periods[month];
-  const projection = projectionIllustration(ledger, month);
+  const row = periods.at(month);
+  const projection = row ? projectionIllustration(ledger, month) : null;
   const cohorts = periods.map((period, index) => ({ ...period, cohort: dueCohort(ledger, index) }));
   const metrics = [
-    { label: "Opening", amount: row.opening },
-    { label: "New postings", amount: row.posted },
-    { label: "Cash applied", amount: -row.applied },
-    { label: "Adjustments", amount: row.adjustments },
-    { label: "Closing", amount: row.closing },
+    { label: "Opening", amount: row?.opening },
+    { label: "New postings", amount: row?.posted },
+    { label: "Cash applied", amount: row ? -row.applied : undefined },
+    { label: "Adjustments", amount: row?.adjustments },
+    { label: "Closing", amount: row?.closing },
   ];
   const documents = ledger === "ar" ? financePreview.invoices : financePreview.bills;
-  const contributors = documents.reduce<Record<string, { id: string; name: string; change: number }>>((result, document) => {
+  const contributors = row ? documents.reduce<Record<string, { id: string; name: string; change: number }>>((result, document) => {
     const entry = result[document.partyId] ?? { id: document.partyId, name: document.party, change: 0 };
     if (document.posted >= row.start && document.posted <= row.end) entry.change += document.face;
     for (const allocation of document.allocations) if (allocation.date >= row.start && allocation.date <= row.end) entry.change -= allocation.amount;
     for (const adjustment of document.adjustments) if (adjustment.date >= row.start && adjustment.date <= row.end) entry.change += adjustment.amount;
     result[document.partyId] = entry;
     return result;
-  }, {});
+  }, {}) : {};
   const daily: { date: string; opening: number; posted: number; applied: number; adjustments: number; closing: number }[] = [];
-  for (let day = 1; day <= Number(row.end.slice(-2)); day++) {
+  for (let day = 1; row && day <= Number(row.end.slice(-2)); day++) {
     const at = `${row.start.slice(0, 8)}${String(day).padStart(2, "0")}`;
     const prior = day === 1 ? row.opening : daily[day - 2].closing;
     const posted = documents.filter((item) => item.posted === at).reduce((sum, item) => sum + item.face, 0);
@@ -41,8 +43,13 @@ export function PeriodAnalysis({ ledger }: { ledger: "ar" | "ap" }) {
 
   return (
     <section className="panel finance-panel">
-      <header className="finance-panel-heading"><div><h2>Period analysis</h2><p>Movements in the supplied 2025 ledger</p></div><label className="preview-state-select">Period<select value={month} onChange={(event) => setMonth(Number(event.target.value))}>{periods.map((item, index) => <option key={item.month} value={index}>{item.month} 2025</option>)}</select></label></header>
-      <dl className="movement-strip">{metrics.map((item) => <div key={item.label}><dt>{item.label}</dt><dd>{money(item.amount)}</dd></div>)}</dl>
+      <header className="finance-panel-heading">
+        <div><h2>Period analysis</h2><p>{isStaticView ? "Movements in the supplied 2025 ledger" : "Ledger movements"}</p></div>
+        <label className="preview-state-select">Period<select value={isStaticView ? month : ""} disabled={!isStaticView} onChange={(event) => setMonth(Number(event.target.value))}>
+          {isStaticView ? periods.map((item, index) => <option key={item.month} value={index}>{item.month} 2025</option>) : <option value="">No periods</option>}
+        </select></label>
+      </header>
+      <dl className="movement-strip">{metrics.map((item) => <div key={item.label}><dt>{item.label}</dt><dd>{item.amount === undefined ? "—" : money(item.amount)}</dd></div>)}</dl>
       <h3>Billing, cash and due cohorts</h3>
       <DataTable label="Monthly billing and cash" rows={cohorts} getRowKey={(item) => item.month} columns={[
         { id: "month", label: "Month", cell: (item) => `${item.month} 2025` },
@@ -63,7 +70,7 @@ export function PeriodAnalysis({ ledger }: { ledger: "ar" | "ap" }) {
           { id: "change", label: "Signed change", align: "right", compare: (a, b) => a.change - b.change, cell: (item) => money(item.change) },
         ]} pageSize={5} />
       <h3>Where ageing exposure changed</h3>
-      <DataTable label="Ageing bucket changes" rows={ageingMovement(ledger, month)} getRowKey={(item) => item.label} columns={[
+      <DataTable label="Ageing bucket changes" rows={row ? ageingMovement(ledger, month) : []} getRowKey={(item) => item.label} columns={[
         { id: "bucket", label: "Due-date bucket", cell: (item) => item.label },
         { id: "opening", label: "Previous close", align: "right", cell: (item) => money(item.opening) },
         { id: "closing", label: "Selected close", align: "right", cell: (item) => money(item.closing) },
@@ -80,7 +87,7 @@ export function PeriodAnalysis({ ledger }: { ledger: "ar" | "ap" }) {
           </dl>
           <p className="footnote">Illustration = selected close + mean net balance movement over the last three completed months. It assumes similar billing, allocation and adjustment behavior. It is not a forecast or promised collection.</p>
         </>
-      ) : <p className="footnote">Unavailable for this period. Select March or later to supply three completed comparison months.</p>}
+      ) : <p className="footnote">{isStaticView ? "Unavailable for this period. Select March or later to supply three completed comparison months." : "No live balance history yet."}</p>}
       <h3>Daily opening-to-closing movement</h3>
       <DataTable label="Daily movement" rows={daily} getRowKey={(item) => item.date} columns={[
         { id: "date", label: "Date", cell: (item) => item.date },
