@@ -4,7 +4,9 @@ A DDL Labs assignment application for accounts receivable, accounts payable and 
 
 ## Current progress
 
-The app has a Next.js scaffold, shadcn/ui styling and a working server-side Neon PostgreSQL connection. The database health endpoint executes a real query through the running app. The static dashboard is the next feature stage. Financial tables, dataset import and AI integration follow static UI approval.
+The six dashboard screens and shared design components are implemented as a static preview. They include reusable tables and stats, chart and number animations, route skeletons, source-record panels, and a scripted Assistant. Neon is connected through the database health endpoint.
+
+**Static frontend implementation is complete against the current plan; final UI approval is pending.** Detailed customer risk and collections, configurable AR/AP ageing, period movements and due cohorts, AP settlement and payment review, and measures are implemented against a prepared source snapshot. All six scripted Assistant answers include fuller findings, tables and links. Group concentration, ageing-bucket changes, a labelled three-month-based balance illustration and unique-invoice collection opportunities are available. Collection and disputed portions appear separately. Browser/mobile and microphone verification are deferred. Financial schema/import, business APIs, live AI and delivery artifacts remain later stages.
 
 The supplied dataset uses INR and a reporting date of **31 December 2025**. Place the original starter pack at `DDL_Labs_WC_Starter_Data/` before the later import stage. The data folder is excluded from Git and must be supplied separately with the submission.
 
@@ -17,7 +19,30 @@ npm ci
 npm run dev
 ```
 
-Open [localhost:3000](http://localhost:3000). The starting page runs without credentials. The database endpoint needs a PostgreSQL connection as described below.
+Open [localhost:3000](http://localhost:3000). The static dashboard runs without credentials. The database endpoint needs a PostgreSQL connection as described below.
+
+## Static dashboard preview
+
+The overview, receivables, payables, risk and exceptions, action queue and assistant pages show a preview of the planned experience. The sample tables support search, sorting, pagination and source-record details; the assistant offers scripted examples and does not call an AI model. The displayed portfolio figures describe the supplied snapshot, and finance tables use a prepared snapshot of all eligible source documents. No business data is fetched from the database yet.
+
+Overview is the landing page. The left column shows headline balances, a month-end AR/AP chart, and sample disputes with links to the supporting records and related holds. The right column places a three-group due-date ageing summary above a searchable invoice list. Expand the summary to see the five original buckets. Ageing and the chart cover the starter dataset. Invoice filters apply to the prepared source records. The same `DataTable` component renders finance tables and tables inside Assistant answers. Each screen supplies its columns, filters, search fields, and default page size. The compact shared footer shows the visible row range, a rows-per-page selector, Page X of Y, and first/previous/next/last buttons. Narrow screens keep previous/next navigation, and empty results disable navigation. Overview, Receivables, and Payables also share `StatCard`. A card can display a plain value or accept a chart. Balance cards use the 2025 month-end series. Assistant is the next navigation item. The top bar menu opens a responsive navigation drawer. It starts closed at every viewport width and closes after a page selection. The overview can open the assistant with a collection question ready to send. Example answers link to source records, and the composer stays in place while the conversation scrolls. Use **Clear conversation** to reset the current conversation.
+
+Try an Assistant question from **Examples** to see the simulated loading steps, a sample answer with figures, and evidence links that open in a new tab. **Stop response** cancels the preview, and **Retry** repeats the latest interrupted request. The Examples menu also offers simulated service and request limit errors. For a clarification example, type “Show overdue balances.”
+
+The Assistant uses the same dark theme and blue accents as the dashboard. Click the microphone to dictate on a supported browser. An animated waveform marks recording, and the composer shows interim text as the browser returns it. Stop dictation manually or pause for five seconds, then edit or send the draft. Voice recognition needs browser permission and a secure context. Browser speech services may process the audio. Typed input is available on every supported app browser.
+
+Browser interaction and visual verification have not been performed. Route skeletons, table empty states and Assistant failure previews are implemented. Detailed finance tabs include simulated loading, empty, error and unavailable states. Shared StateMessage layouts give finance, page failures, empty tables and interrupted chat replies a clear explanation and separate recovery actions. Buttons wrap on narrow screens; empty-table filter reset stays outside the horizontal scroller. The pending acceptance steps and live integration work are listed in the local progress document.
+
+The detailed finance screens use `src/lib/finance-preview.json` as bundled static data. The preview requires no preparation script. The raw starter files remain separately supplied for the later database import. AR and AP tabs let reviewers inspect ageing, monthly and daily movements, due cohorts, settlement timing, concentration, customer profiles and bill controls. The **Preview state** selector exposes failure states for UI review. Measures includes group concentration with member links. Period analysis compares ageing buckets and shows a one-month balance illustration using the last three completed months. Action Queue → Collection opportunities counts each overdue invoice once, separates qualifying disputed portions, and keeps already-received unallocated cash outside the collection total. These values are review scopes, not guaranteed receipts.
+
+## Project structure
+
+- `src/app/layout.tsx` defines the HTML document and global theme.
+- `src/app/(dashboard)/layout.tsx` owns the sidebar, top bar, and main content area. Overview, Receivables, Payables, Exceptions, Action Queue, and Assistant each have their own `page.tsx` inside this route group. Their public URLs omit the group name. Overview lives in its own route group so its loading screen applies only to the landing page.
+- `src/features/` holds the screen components by finance domain. `src/components/dashboard/` holds shared dashboard components, and `src/components/ui/` holds reusable controls such as `DataTable`.
+- `src/app/api/` holds API routes. Server-side database code lives in `src/server/`.
+
+Each dashboard route has a Next.js `loading.tsx` fallback. The placeholders mirror the stats, table, chart, or chat content that is still loading. Static pages can load quickly enough to skip the placeholder. Headline values and initial record totals animate from zero and respect reduced-motion settings.
 
 ## Installed stack
 
@@ -28,6 +53,7 @@ Open [localhost:3000](http://localhost:3000). The starting page runs without cre
 | shadcn | 4.23.0 | Component CLI and shared styles |
 | Tailwind CSS / @tailwindcss/postcss | 4.3.5 | Utility styling and CSS build pipeline |
 | Radix UI | 1.8.1 | UI interaction primitives |
+| Motion for React | 14.14.0 | Sidebar enter and exit animation |
 | TypeScript | 6.0.3 | Compile-time type checking |
 | Zod | 4.6.7 | Runtime validation for future request and tool inputs |
 | pg | 8.23.1 | Server-side PostgreSQL connection pool |
@@ -47,7 +73,7 @@ ESLint 9.39.5 is deprecated upstream. The current React lint plugin requires ESL
 
 shadcn/ui uses Radix Nova components with the user-supplied blue-accent theme and dark mode enabled by default. `components.json` points generated components to `src/components/ui/` and shared styles to `src/app/globals.css`. Tailwind CSS v4 runs through `postcss.config.mjs`. The starting Button component is at `src/components/ui/button.tsx`.
 
-Add a component when a feature needs it, for example with `npx shadcn add card`. The installed CLI version is pinned in the package manifest and lockfile. Theme values are editable CSS variables. The theme declares Inter for sans-serif text, Source Serif 4 for serif text and JetBrains Mono for monospace text, with the supplied fallback families. Font files are not bundled with the CSS theme. The shadcn installation passed production build, TypeScript and lint checks. Browser interaction and visual checks remain pending.
+Add a component when a feature needs it, for example with `npx shadcn add card`. The installed CLI version is pinned in the package manifest and lockfile. Theme values are editable CSS variables. Action buttons use primary-derived blue fills; secondary controls have blue tinted surfaces and borders. Selected filters/tabs, hover, keyboard focus and disabled states are distinct. Root-level tokens keep portalled menus consistent with the page. The theme declares Inter for sans-serif text, Source Serif 4 for serif text and JetBrains Mono for monospace text, with the supplied fallback families. Font files are not bundled with the CSS theme. The shadcn installation passed production build, TypeScript and lint checks. Browser interaction and visual checks remain pending.
 
 ## Build and code checks
 
@@ -135,11 +161,12 @@ The setup verification on 19 November 2026 passed the production build and a liv
 
 ## Project references
 
-The following references are available in the local workspace and excluded from Git by the user's request.
+The following references are available in the local checkout and excluded from Git by the user's request.
 
 - Assignment explanation at `ASSIGNMENT_EXPLAINED.md`.
 - Starter data guide at `DDL_Labs_WC_Starter_Data/README_Data_Guide.txt`.
 - Interview guide at `docs/interview-guide.md`.
+- Current implementation checklist at `docs/progress.md`.
 
 The assignment's technical documentation and test report must still be included in the final submission through a separate artifact or agreed delivery location. This README retains the repository setup instructions, and `.env.example` remains eligible for Git as the required environment template.
 
