@@ -606,7 +606,17 @@
 .table-status.overdue { color: var(--warning-ink); background: var(--warning-surface); }
 .table-status.settled { color: #a9e2ca; background: #29453b; }
 
-dialog.detail-modal {
+.detail-modal-backdrop,
+.detail-modal::backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / .65);
+  z-index: 50;
+  backdrop-filter: blur(2px);
+}
+
+dialog.detail-modal,
+.detail-modal {
   position: fixed;
   inset: 0 0 0 auto;
   width: min(100%, 440px);
@@ -619,9 +629,9 @@ dialog.detail-modal {
   color: var(--foreground);
   background: var(--popover);
   border-left: 1px solid var(--border);
+  z-index: 51;
+  box-shadow: -10px 0 30px rgb(0 0 0 / .5);
 }
-
-.detail-modal::backdrop { background: rgb(0 0 0 / .65); }
 .modal-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .modal-header h2 { margin-top: 4px; font-size: 22px; font-weight: 650; }
 .modal-header p, .mini-label { color: var(--muted-foreground); font-size: 13px; }
@@ -1213,6 +1223,133 @@ select option { color: var(--foreground); background: var(--popover); }
 .coverage-details p { margin-top: 10px; color: var(--muted-foreground); }
 .finance-reasons { padding-left: 18px; list-style: disc; margin-top: 12px; font-size: 13px; }
 .evidence-text-link { display: block; color: var(--action-text); }
+
+/* Customer Review Profile Drilldown */
+.customer-review-card {
+  margin-top: 28px;
+  padding: 24px;
+  background: color-mix(in oklch, var(--card) 85%, var(--background));
+  border: 1px solid var(--border);
+  border-radius: var(--panel-radius);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.customer-review-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--surface-line);
+}
+
+.customer-review-title {
+  margin: 4px 0 2px;
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.customer-review-subtitle {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  margin: 0;
+}
+
+.customer-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.customer-metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.customer-metric-card .metric-label {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.customer-metric-card .metric-value {
+  color: var(--foreground);
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.customer-metric-card .metric-value.overdue {
+  color: var(--warning-ink);
+}
+
+.customer-review-notice {
+  margin: 0;
+  padding: 10px 14px;
+  background: var(--active-surface);
+  border: 1px solid var(--button-border);
+  border-radius: 8px;
+}
+
+.customer-review-notice .footnote {
+  margin: 0;
+  color: var(--accent-foreground);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.customer-invoices-container {
+  margin-top: 4px;
+  min-width: 0;
+}
+
+.nested-finance-panel {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.nested-finance-panel .overview-section-heading,
+.nested-finance-panel .finance-panel-heading {
+  margin-bottom: 0;
+}
+
+.nested-finance-panel .overview-section-heading h2,
+.nested-finance-panel .finance-panel-heading h2 {
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.customer-review-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 18px;
+  border-top: 1px solid var(--surface-line);
+  margin-top: 8px;
+}
+
+.close-profile-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-weight: 550;
+  font-size: 13px;
+  cursor: pointer;
+}
 @media (max-width: 740px) {
   .movement-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .finance-two-column { grid-template-columns: 1fr; }

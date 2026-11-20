@@ -10,7 +10,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "migrate": "tsx scripts/migrate.ts",
+    "import:data": "tsx scripts/import-data.ts"
   },
   "dependencies": {
     "@neon/config": "1.14.4",

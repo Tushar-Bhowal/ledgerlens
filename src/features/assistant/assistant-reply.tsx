@@ -89,7 +89,6 @@ export function AssistantReply({ reply, onChoose, onRetry, retryDisabled }: {
       <div className="reply-loading" aria-busy="true">
         <span className="reply-dots" aria-hidden="true"><i /><i /><i /></span>
         <span>{loadingSteps[reply.step]}…</span>
-        <span className="reply-preview-label">Preview</span>
       </div>
     );
   }
@@ -114,7 +113,7 @@ export function AssistantReply({ reply, onChoose, onRetry, retryDisabled }: {
 
   return (
     <div className="reply-complete">
-      <p>{clarifying ? "Which of these would you like to investigate?" : "That question is outside the scripted preview. Try a sample below or open Examples for the full list."}</p>
+      <p>{clarifying ? "Which of these would you like to investigate?" : "I could not find a specific answer for that question. Try a question below or open Examples."}</p>
       <div className="reply-choices">
         {choices.map((question) => <button type="button" className="assistant-tool follow-up" key={question} onClick={() => onChoose(question)}>{question}</button>)}
       </div>

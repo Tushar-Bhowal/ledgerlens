@@ -3,7 +3,6 @@
 import { useRef, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowDownUp, ArrowUp, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, EllipsisVertical, Inbox, RotateCcw, Search, SearchX, Settings, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import { DropdownMenu, Popover } from "radix-ui";
-import { useStaticView } from "@/components/dashboard/view-mode";
 import { CountUp } from "./count-up";
 import { StateMessage } from "./state-message";
 
@@ -46,28 +45,24 @@ type DataTableProps<Row> = {
 
 type TableAction = { label: string; onSelect: () => void };
 
-function RowActions({ label, actions }: { label: string; actions: readonly TableAction[] }) {
-  const trigger = useRef<HTMLButtonElement>(null);
-  const pendingAction = useRef<(() => void) | null>(null);
-
+export function RowActions({ label, actions }: { label: string; actions: readonly TableAction[] }) {
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
-        <button type="button" className="table-row-menu" aria-label={`Actions for ${label}`} ref={trigger}>
+        <button type="button" className="table-row-menu" aria-label={`Actions for ${label}`}>
           <EllipsisVertical size={16} aria-hidden="true" />
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content className="table-popup table-action-popup" align="end" sideOffset={6} onCloseAutoFocus={(event) => {
-          if (!pendingAction.current) return;
-          event.preventDefault();
-          trigger.current?.focus();
-          const action = pendingAction.current;
-          pendingAction.current = null;
-          action();
-        }}>
+        <DropdownMenu.Content className="table-popup table-action-popup" align="end" sideOffset={6}>
           {actions.map(({ label, onSelect }) => (
-            <DropdownMenu.Item key={label} className="table-menu-item" onSelect={() => { pendingAction.current = onSelect; }}>
+            <DropdownMenu.Item
+              key={label}
+              className="table-menu-item"
+              onSelect={() => {
+                onSelect();
+              }}
+            >
               {label}
             </DropdownMenu.Item>
           ))}
@@ -92,8 +87,7 @@ export function DataTable<Row>({
   rowActions,
   density = "comfortable",
 }: DataTableProps<Row>) {
-  const isStaticView = useStaticView();
-  const rows = isStaticView ? previewRows : [];
+  const rows = previewRows;
   const [query, setQuery] = useState("");
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [sort, setSort] = useState(defaultSort);
@@ -285,9 +279,9 @@ export function DataTable<Row>({
         <StateMessage
           compact
           heading="h3"
-          icon={isStaticView && (term || activeFilters > 0) ? SearchX : Inbox}
-          title={isStaticView && (term || activeFilters > 0) ? "No matching records" : "No records in this view"}
-          description={isStaticView ? emptyMessage ?? (term || activeFilters > 0 ? "Try a different search or clear your filters to see more records." : "Records will appear here when they are available.") : "Live records will appear here when available."}
+          icon={term || activeFilters > 0 ? SearchX : Inbox}
+          title={term || activeFilters > 0 ? "No matching records" : "No records in this view"}
+          description={emptyMessage ?? (term || activeFilters > 0 ? "Try a different search or clear your filters to see more records." : "Records will appear here when they are available.")}
         >
           {(term || activeFilters > 0) && <button type="button" className="table-tool-button" onClick={() => { setQuery(""); setSelections({}); setPage(0); (searchInput.current ?? filterTrigger.current)?.focus(); }}><RotateCcw size={16} aria-hidden="true" /> Clear search and filters</button>}
         </StateMessage>

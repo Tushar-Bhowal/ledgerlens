@@ -12,7 +12,7 @@ export function DocumentEvidence({ document: row, ledger, onClose }: { document:
     <EvidenceDrawer titleId={titleId} onClose={onClose}>
       <div className="modal-header">
         <div><span className="mini-label">SOURCE EVIDENCE · 31 DEC 2025</span><h2 id={titleId}>{row.number}</h2><p>{row.party} · {row.id}</p></div>
-        <button type="button" aria-label="Close evidence" onClick={(event) => event.currentTarget.closest("dialog")?.close()}><X size={20} aria-hidden="true" /></button>
+        <button type="button" aria-label="Close evidence" onClick={onClose}><X size={20} aria-hidden="true" /></button>
       </div>
       <dl className="detail-list">
         <div><dt>Original amount</dt><dd>{money(row.face)}</dd></div>

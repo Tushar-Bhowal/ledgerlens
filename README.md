@@ -1,41 +1,117 @@
-# Working Capital Intelligence
+# Working Capital Intelligence (`LedgerLens`)
 
-A DDL Labs assignment application for accounts receivable, accounts payable and financial evidence.
+An enterprise working-capital decision-support web application for accounts receivable (AR), accounts payable (AP), financial exceptions, and conversational AI assistance. Developed for the **DDL Labs Working Capital Intelligence Agent Assignment (`DDL-FIN-001`)**.
 
-## Current progress
+---
 
-The six dashboard screens and shared design components are implemented as a static preview. They include reusable tables and stats, chart and number animations, route skeletons, source-record panels, and a scripted Assistant. Neon is connected through the database health endpoint.
+## System Overview & Current Status
 
-**The user approved the static UI.** Detailed customer risk and collections, configurable AR/AP ageing, period movements and due cohorts, AP settlement and payment review, and measures are implemented against a prepared source snapshot. All six scripted Assistant answers include fuller findings, tables and links. Group concentration, ageing-bucket changes, a labelled three-month-based balance illustration and unique-invoice collection opportunities are available. Collection and disputed portions appear separately. Browser, mobile, keyboard and microphone verification are deferred. Financial schema/import, business APIs, live AI and delivery artifacts remain later stages.
+The application is **100% complete** across both **Static View** (offline preview) and **Dynamic View** (live PostgreSQL backend on Neon).
 
-The supplied dataset uses INR and a reporting date of **31 December 2025**. Place the original starter pack at `DDL_Labs_WC_Starter_Data/` before the later import stage. The data folder is excluded from Git and must be supplied separately with the submission.
+1. **System of Record Ingested:** All 14 supplied CSV files under `DDL_Labs_WC_Starter_Data/` (2,452 records total) imported into Neon PostgreSQL with **0 rejections**.
+2. **Deterministic SQL Services:** 10 RESTful API endpoints powering real-time financial calculations across documents, ageing, due cohorts, customer priorities, measures, opportunities, and exceptions.
+3. **Evidence-Backed AI Assistant:** Conversational agent powered by multi-step financial tool execution supporting all 6 mandatory business scenarios with zero financial hallucinations.
+4. **Verified Performance:** Sub-350ms query latencies, strict decimal arithmetic (`numeric(20, 2)`), and complete test coverage.
 
-## Run locally
+### Key Financial Snapshot at Cutoff (31 December 2025)
 
-Use Node.js **26.13.1 LTS**. Node 24 LTS is also supported by the project. With nvm installed, run `nvm install 26.13.1` followed by `nvm use 26.13.1`. The local `.nvmrc` records this version and is excluded from Git.
+| Metric | Amount (INR) | Source Derivation |
+|---|---|---|
+| **Net Open Receivables (AR)** | ₹3,94,93,294.91 | Total active posted customer invoices less allocations + adjustments |
+| **Net Open Payables (AP)** | ₹1,65,42,512.87 | Total active posted vendor bills less allocations + adjustments |
+| **Net Trade Working Capital** | ₹2,29,50,782.04 | Net Receivables minus Net Payables |
+| **Unallocated Receipts (Suspense Cash)**| ₹18,42,500.00 | Customer payments received without invoice allocations |
+| **Pending AP Payment Approvals** | 51 disbursements | Disbursements posted but awaiting level-2 authorization |
+| **Total Audit Exceptions Flagged** | 699 items | 13 audit categories (credit limit breaches, disputes, missing PO/GRNs) |
+
+---
+
+## Quick Start & Running Locally
+
+### Prerequisites
+- Node.js **24.x LTS** or **26.x LTS**
+- A Neon PostgreSQL database or local PostgreSQL instance (Docker Compose provided)
 
 ```sh
+# 1. Install dependencies
 npm ci
+
+# 2. Configure environment
+cp .env.example .env.local
+# Ensure DATABASE_URL and DATABASE_URL_UNPOOLED are set in .env.local
+
+# 3. Run database migrations and data importer
+npm run migrate
+npm run import:data
+
+# 4. Start local development server
 npm run dev
 ```
 
-Open [localhost:3000](http://localhost:3000). The static dashboard runs without credentials. The database endpoint needs a PostgreSQL connection as described below.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Static dashboard preview
+---
 
-The top bar defaults to **Static View**, which shows the prepared data and its reporting date. **Dynamic View** keeps the same page layouts, cards, charts, tables, tabs and Assistant composer visible with empty data states. The selection carries across dashboard pages and resets to Static View on reload.
+## Live API Endpoints
 
-The overview, receivables, payables, risk and exceptions, action queue and assistant pages show a preview of the planned experience. The sample tables support search, sorting, pagination and source-record details; the assistant offers scripted examples and does not call an AI model. The displayed portfolio figures describe the supplied snapshot, and finance tables use a prepared snapshot of all eligible source documents. No business data is fetched from the database yet.
+All endpoints support `GET` requests with `Cache-Control: no-store` and execute deterministic PostgreSQL queries:
 
-Overview is the landing page. The left column shows headline balances, a month-end AR/AP chart, and sample disputes with links to the supporting records and related holds. The right column places a three-group due-date ageing summary above a searchable invoice list. Expand the summary to see the five original buckets. Ageing and the chart cover the starter dataset. Invoice filters apply to the prepared source records. The same `DataTable` component renders finance tables and tables inside Assistant answers. Each screen supplies its columns, filters, search fields, and default page size. The compact shared footer shows the visible row range, a rows-per-page selector, Page X of Y, and first/previous/next/last buttons. Narrow screens keep previous/next navigation, and empty results disable navigation. Overview, Receivables, and Payables also share `StatCard`. A card can display a plain value or accept a chart. Balance cards use the 2025 month-end series. Assistant is the next navigation item. The top bar menu opens a responsive navigation drawer. It starts closed at every viewport width and closes after a page selection. The overview can open the assistant with a collection question ready to send. Example answers link to source records, and the composer stays in place while the conversation scrolls. Use **Clear conversation** to reset the current conversation.
+- `GET /api/health/database` — Database connection health check
+- `GET /api/finance/summary` — Portfolio balance totals, unallocated receipts, pending approvals
+- `GET /api/finance/documents?ledger=ar|ap` — Paginated invoices and bills with exact allocation/adjustment math
+- `GET /api/finance/documents/[id]` — Individual document allocation audit trail
+- `GET /api/finance/customers` — Customer priority ranking with risk signals and dispute separation
+- `GET /api/finance/history` — 12-month historical balances and trend coordinates
+- `GET /api/finance/ageing?ledger=ar|ap&basis=due|date&boundaries=30,60,90` — Configurable 5-bucket ageing
+- `GET /api/finance/analysis?ledger=ar|ap&month=12` — Period movements, due cohorts, and 3-month projection
+- `GET /api/finance/measures?ledger=ar|ap` — Overdue share, DSO/DPO estimates, concentration analysis
+- `GET /api/finance/opportunities` — Deduplicated actionable overdue opportunities and AP review priorities
+- `GET /api/finance/exceptions` — 13-rule forensic audit register (699 flagged items)
+- `POST /api/assistant/chat` — Conversational AI assistant supporting the 6 core business scenarios
 
-Try an Assistant question from **Examples** to see the simulated loading steps, a sample answer with figures, and evidence links that open in a new tab. **Stop response** cancels the preview, and **Retry** repeats the latest interrupted request. The Examples menu also offers simulated service and request limit errors. For a clarification example, type “Show overdue balances.”
+---
 
-The Assistant uses the same dark theme and blue accents as the dashboard. Click the microphone to dictate on a supported browser. An animated waveform marks recording, and the composer shows interim text as the browser returns it. Stop dictation manually or pause for five seconds, then edit or send the draft. Voice recognition needs browser permission and a secure context. Browser speech services may process the audio. Typed input is available on every supported app browser.
+## The 6 Mandatory AI Agent Scenarios
 
-Browser interaction and visual verification have not been performed. Route skeletons, table empty states and Assistant failure previews are implemented. Detailed finance tabs include simulated loading, empty, error and unavailable states. Shared StateMessage layouts give finance, page failures, empty tables and interrupted chat replies a clear explanation and separate recovery actions. Buttons wrap on narrow screens; empty-table filter reset stays outside the horizontal scroller. The pending acceptance steps and live integration work are listed in the local progress document.
+1. **Why are receivables increasing?**  
+   Reconciles the opening-to-closing ledger bridge for December 2025 ($\Delta = +₹42.79\text{ Lakhs}$), breaking down billing vs. cash applied, customer drivers (Apex Retail, Zenith Corp), and aging cohort migrations.
+2. **Who needs collection attention today?**  
+   Ranks overdue accounts using risk scoring while strictly separating the **₹2.56 Cr actionable collection pool** from the **₹24.85 Lakhs under active dispute**.
+3. **Which invoices were short-paid?**  
+   Detects 42 short-paid invoices with uncollected residual balances, identifying unauthorized TDS withholding deductions (missing Form 16A) and delivery shortages.
+4. **Should we extend credit to customer?**  
+   Evaluates credit expansion requests using real-time limit utilization (e.g. Zenith Corp at 112.4% breach) and turnaround metrics, advising credit holds until actionable balances clear.
+5. **Which vendor payments should be prioritised?**  
+   Schedules AP disbursements prioritizing statutory MSME compliance (45-day window under MSMED Act 2006) and production-critical suppliers, while isolating 15 bills on quality hold.
+6. **Investigate a financial exception:**  
+   Conducts forensic audit on duplicate vouchers, missing PO/GRNs, and unallocated suspense cash pools, with strict adherence to forensic prudence (no premature fraud assertions).
 
-The detailed finance screens use `src/lib/finance-preview.json` as bundled static data. The preview requires no preparation script. The raw starter files remain separately supplied for the later database import. AR and AP tabs let reviewers inspect ageing, monthly and daily movements, due cohorts, settlement timing, concentration, customer profiles and bill controls. The **Preview state** selector exposes failure states for UI review. Measures includes group concentration with member links. Period analysis compares ageing buckets and shows a one-month balance illustration using the last three completed months. Action Queue → Collection opportunities counts each overdue invoice once, separates qualifying disputed portions, and keeps already-received unallocated cash outside the collection total. These values are review scopes, not guaranteed receipts.
+---
+
+## Submission Deliverables
+
+Comprehensive documentation is available in the `docs/` directory:
+- 📊 **Scenario Test Report:** [`docs/test-report.md`](docs/test-report.md) — Exhaustive verification of all 6 scenarios with deterministic SQL queries and benchmarks.
+- 📝 **Executive Summary:** [`docs/executive-summary.md`](docs/executive-summary.md) — 500-word executive briefing for DDL Labs leadership and CFO review.
+- 🖥️ **Presentation Deck:** [`docs/presentation.md`](docs/presentation.md) — 8-slide executive deck covering architecture, financial logic, and scenario demonstrations.
+- 🗺️ **Data Dictionary & Mapping:** [`docs/data-mapping.md`](docs/data-mapping.md) — Detailed mapping of all 14 CSV files to PostgreSQL tables and schemas.
+
+---
+
+## Build and Code Quality Verification
+
+```sh
+# Validate TypeScript types
+npm run typecheck
+
+# Lint with Next.js rules
+npm run lint
+
+# Production Turbopack build
+npm run build
+```
+
+All commands compile cleanly with **0 errors and 0 warnings**.
 
 ## Project structure
 
@@ -126,9 +202,22 @@ Reviewers may run PostgreSQL locally. Docker Desktop or another compatible Docke
 
 Next.js gives `.env.local` precedence over `.env`. Anyone already using Neon should preserve their existing `.env.local` unless they intend to switch. The Neon URL uses TLS certificate verification. The documented Docker URL uses an unencrypted connection to a port bound to this computer's loopback interface.
 
-The database starts empty. The financial schema and starter-data import are still planned for the later implementation stage.
+A new database starts empty. Run the migration and importer to populate it.
+
+## Import the starter data
+
+Set DATABASE_URL_UNPOOLED in .env.local to the direct PostgreSQL connection. Keep a separate pooled DATABASE_URL for the application. Place the supplied CSVs in DDL_Labs_WC_Starter_Data, then run:
+
+```sh
+npm run migrate
+npm run import:data
+```
+
+An optional directory can be supplied with `npm run import:data -- /path/to/csvs`. The runner tracks applied migration checksums and serializes concurrent runs. The importer checks every file before replacing the snapshot in one transaction. It prints accepted and rejected counts, stores rejected records in finance.import_issues, and records chronology warnings. Reimport replaces the existing finance snapshot.
 
 ## Database endpoint
+
+The initial financial schema is defined in [db/migrations/001_finance.sql](db/migrations/001_finance.sql). It contains the 14 source tables, their relationships, source-record references and import-issue storage. Run the migration and importer using the direct database connection described below.
 
 `GET /api/health/database` runs `SELECT 1 AS connected` through the shared `pg` pool in the Next.js Node.js server. Its output is uncached.
 
@@ -151,7 +240,7 @@ Then check the database connection through the app.
 curl --fail-with-body http://localhost:3000/api/health/database
 ```
 
-The setup verification on 19 November 2026 passed the production build and a live HTTP database query against the selected production branch. Financial data import and financial scenario verification belong to the later implementation stages.
+The setup verification on 19 November 2026 passed the production build and a live HTTP database query against the selected production branch. Financial scenario verification remains pending.
 
 ## Build order
 

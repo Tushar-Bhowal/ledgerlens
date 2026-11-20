@@ -7,11 +7,10 @@ import Link from "next/link";
 import { Dialog } from "radix-ui";
 import { dashboardNavigation } from "./navigation";
 
-export function Sidebar({ open, pathname, onNavigate, showSnapshot }: {
+export function Sidebar({ open, pathname, onNavigate }: {
   open: boolean;
   pathname: string;
   onNavigate: () => void;
-  showSnapshot: boolean;
 }) {
   const reduceMotion = useReducedMotion();
   const slide = { x: reduceMotion ? 0 : "-100%" };
@@ -49,7 +48,7 @@ export function Sidebar({ open, pathname, onNavigate, showSnapshot }: {
                     </Link>
                   ))}
                 </nav>
-                {showSnapshot && <div className="source-note"><span>Starter dataset</span><span>INR</span></div>}
+                <div className="source-note"><span>PostgreSQL (Live)</span><span>INR (₹)</span></div>
               </m.aside>
             </Dialog.Content>
           </Dialog.Portal>

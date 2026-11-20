@@ -6,12 +6,12 @@ import { Dialog } from "radix-ui";
 import { useState, type ReactNode } from "react";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
-import { StaticViewContext } from "./view-mode";
+import { LiveSummaryProvider } from "./live-summary";
+import { LiveHistoryProvider } from "./live-history";
 
 export function DashboardShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [openPath, setOpenPath] = useState<string | null>(null);
-  const [isStaticView, setIsStaticView] = useState(true);
 
   if (openPath !== null && openPath !== pathname) setOpenPath(null);
 
@@ -23,8 +23,6 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       <Dialog.Root open={open} onOpenChange={(next) => setOpenPath(next ? pathname : null)}>
         <Topbar
           pathname={pathname}
-          isStaticView={isStaticView}
-          onViewChange={setIsStaticView}
           menu={
             <Dialog.Trigger asChild>
               <button type="button" className="dashboard-menu-button" aria-label="Open navigation">
@@ -33,10 +31,14 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             </Dialog.Trigger>
           }
         />
-        <Sidebar open={open} pathname={pathname} onNavigate={close} showSnapshot={isStaticView} />
+        <Sidebar open={open} pathname={pathname} onNavigate={close} />
       </Dialog.Root>
       <main className="dashboard-main">
-        <StaticViewContext value={isStaticView}>{children}</StaticViewContext>
+        <LiveSummaryProvider active={true}>
+          <LiveHistoryProvider active={true}>
+            {children}
+          </LiveHistoryProvider>
+        </LiveSummaryProvider>
       </main>
     </>
   );

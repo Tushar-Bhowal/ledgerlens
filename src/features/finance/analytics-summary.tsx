@@ -1,45 +1,126 @@
+"use client";
+
 import Link from "next/link";
-import { StaticPreview } from "@/components/dashboard/view-mode";
+import { useEffect, useState } from "react";
+import { CircleAlert, RotateCcw } from "lucide-react";
+import { DataTableSkeleton } from "@/components/ui/loading-skeletons";
+import { StateMessage } from "@/components/ui/state-message";
 import { StatCard } from "@/components/ui/stat-card";
-import { days, financePreview, percent } from "./preview-data";
-import { concentrations } from "./preview-selectors";
+import { days, percent } from "./preview-data";
 import { money } from "@/lib/demo-data";
+import type { MeasuresResult } from "@/server/finance/measures";
 
 export function AnalyticsSummary({ ledger }: { ledger: "ar" | "ap" }) {
-  const metrics = financePreview.metrics[ledger];
-  const documents = ledger === "ar" ? financePreview.invoices : financePreview.bills;
+  const [liveData, setLiveData] = useState<MeasuresResult | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`/api/finance/measures?ledger=${ledger}`, { signal: controller.signal, cache: "no-store" })
+      .then((res) => {
+        if (!res.ok) throw new Error("Measures unavailable");
+        return res.json() as Promise<MeasuresResult>;
+      })
+      .then((data) => {
+        setLiveData(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (err.name !== "AbortError") {
+          setError(true);
+          setLoading(false);
+        }
+      });
+    return () => controller.abort();
+  }, [ledger]);
+
+  const metrics = {
+    positive: liveData ? Number(liveData.totalPositive) : 0,
+    overduePercent: liveData?.overduePercent ?? null,
+    proxyDays: liveData?.proxyDays ?? null,
+    elapsedDays: liveData?.elapsedDays ?? null,
+    patterns: liveData?.patterns.map((p) => ({ label: p.label, amount: Number(p.amount) })) ?? [],
+  };
+
   const total = metrics.positive;
-  const parties = Object.values(documents.reduce<Record<string, { id: string; party: string; amount: number }>>((result, row) => {
-    const item = result[row.partyId] ?? { id: row.partyId, party: row.party, amount: 0 };
-    item.amount += Math.max(0, row.outstanding);
-    result[row.partyId] = item;
-    return result;
-  }, {})).sort((a, b) => b.amount - a.amount).slice(0, 5);
+  const parties = liveData?.parties.map((p) => ({ id: p.id, party: p.party, amount: Number(p.amount) })) ?? [];
+  const groups = liveData?.groups.map((g) => ({
+    name: g.name,
+    amount: Number(g.amount),
+    share: g.share,
+    members: g.members,
+  })) ?? [];
 
   return (
     <section className="panel finance-panel">
       <header className="finance-panel-heading"><h2>{ledger === "ar" ? "Collection" : "Payment"} measures</h2></header>
-      <div className="stat-strip">
-        <StatCard label="Overdue share" value={metrics.overduePercent ?? "Unavailable"} format="percent" caption="Positive past-due / positive open" />
-        <StatCard label={ledger === "ar" ? "DSO estimate" : "Purchase-based DPO proxy"} value={days(metrics.proxyDays)} caption="2025 supplied ledger estimate" />
-        <StatCard label="Actual settlement days" value={days(metrics.elapsedDays)} caption="Amount-weighted elapsed days" />
-      </div>
-      <StaticPreview><p className="footnote">2025 measures use mean daily balance ÷ net document-date billing × 365. Settlement days weight each allocated portion from the original document date. The AP proxy uses purchases because COGS is absent.</p></StaticPreview>
-      <div className="finance-two-column">
-        <div><h3>Largest party concentrations</h3><StaticPreview fallback={<p className="footnote">No live party balances yet.</p>}><ol className="concentration-list">{parties.map((item) => <li key={item.id}><div>{ledger === "ar" ? <Link className="text-link" href={`/receivables?customer=${item.id}`}>{item.party}</Link> : item.party}<strong>{percent(item.amount / total)}</strong></div><span>{money(item.amount)}</span></li>)}</ol></StaticPreview></div>
-        <div><h3>Allocated cash against due date</h3><dl className="detail-list">{metrics.patterns.map((item) => <div key={item.label}><dt>{item.label}</dt><dd><StaticPreview fallback="—">{money(item.amount)}</StaticPreview></dd></div>)}</dl><p className="footnote">Amounts apply only to settled portions. Open balances do not enter this distribution.</p></div>
-      </div>
-      <h3>Group concentration</h3>
-      <p className="footnote">Members of the same source group are combined. The denominator is all positive outstanding in this ledger.</p>
-      <div className="group-concentration-list">
-        <StaticPreview fallback={<p className="footnote">No live group balances yet.</p>}>{concentrations(ledger).map((group) => (
-          <details key={group.name}>
-            <summary><span>{group.name}</span><strong>{money(group.amount)} · {percent(group.share)}</strong></summary>
-            <ul>{group.members.map((member) => <li key={member.id}><Link className="text-link" href={ledger === "ar" ? `/receivables?customer=${member.id}` : `/payables?vendor=${member.id}`}>{member.name}</Link></li>)}</ul>
+
+      {loading && <DataTableSkeleton columns={3} rows={4} />}
+      {error && !loading && (
+        <StateMessage icon={CircleAlert} title="Measures unavailable" description="Failed to calculate measures from database.">
+          <button type="button" className="table-tool-button" onClick={() => setLoading(true)}><RotateCcw size={16} aria-hidden="true" /> Try again</button>
+        </StateMessage>
+      )}
+
+      {!loading && !error && (
+        <>
+          <div className="stat-strip">
+            <StatCard label="Overdue share" value={metrics.overduePercent ?? "Unavailable"} format="percent" caption="Positive past-due / positive open" />
+            <StatCard label={ledger === "ar" ? "DSO estimate" : "Purchase-based DPO proxy"} value={days(metrics.proxyDays)} caption="2025 supplied ledger estimate" />
+            <StatCard label="Actual settlement days" value={days(metrics.elapsedDays)} caption="Amount-weighted elapsed days" />
+          </div>
+          <p className="footnote">2025 measures use mean daily balance ÷ net document-date billing × 365. Settlement days weight each allocated portion from the original document date. The AP proxy uses purchases because COGS is absent.</p>
+          <div className="finance-two-column">
+            <div>
+              <h3>Largest party concentrations</h3>
+              <ol className="concentration-list">
+                {parties.map((item) => (
+                  <li key={item.id}>
+                    <div>
+                      {ledger === "ar" ? <Link className="text-link" href={`/receivables?customer=${item.id}`}>{item.party}</Link> : item.party}
+                      <strong>{percent(total > 0 ? item.amount / total : 0)}</strong>
+                    </div>
+                    <span>{money(item.amount)}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <div>
+              <h3>Allocated cash against due date</h3>
+              <dl className="detail-list">
+                {metrics.patterns.map((item) => (
+                  <div key={item.label}>
+                    <dt>{item.label}</dt>
+                    <dd>{money(item.amount)}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="footnote">Amounts apply only to settled portions. Open balances do not enter this distribution.</p>
+            </div>
+          </div>
+          <h3>Group concentration</h3>
+          <p className="footnote">Members of the same source group are combined. The denominator is all positive outstanding in this ledger.</p>
+          <div className="group-concentration-list">
+            {groups.map((group) => (
+              <details key={group.name}>
+                <summary><span>{group.name}</span><strong>{money(group.amount)} · {percent(group.share ?? 0)}</strong></summary>
+                <ul>
+                  {group.members.map((member) => (
+                    <li key={member.id}>
+                      <Link className="text-link" href={ledger === "ar" ? `/receivables?customer=${member.id}` : `/payables?vendor=${member.id}`}>{member.name}</Link>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ))}
+          </div>
+          <details className="coverage-details">
+            <summary>Source coverage and unavailable metrics</summary>
+            <p>Inventory, bank statements, GL and COGS are absent. Inventory days, full cash conversion cycle and bank/GL reconciliation are unavailable. Customer credit limits are current values, with no historical change register. This analysis gives no legal recovery conclusion.</p>
           </details>
-        ))}</StaticPreview>
-      </div>
-      <details className="coverage-details"><summary>Source coverage and unavailable metrics</summary><p><StaticPreview fallback="Live source coverage will be available once financial data is connected.">Inventory, bank statements, GL and COGS are absent. Inventory days, full cash conversion cycle and bank/GL reconciliation are unavailable. Customer credit limits are current values, with no historical change register. This preview gives no legal recovery conclusion.</StaticPreview></p></details>
+        </>
+      )}
     </section>
   );
 }
