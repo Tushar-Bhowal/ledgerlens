@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { processAgentMessage, type ClientAiConfig } from "@/server/agent/chat";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const requestSchema = z.object({
   question: z.string().trim().min(1).max(1000),

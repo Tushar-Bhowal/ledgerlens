@@ -225,12 +225,19 @@ async function runTool(context: AgentContext, signal?: AbortSignal): Promise<Pre
 }
 
 async function executeLlmTurn(provider: LlmProvider, question: string, previous?: AgentContext, signal?: AbortSignal): Promise<AgentContext | "clarify" | null> {
-  // Wait for the provider; only a caller cancellation should abort this request.
+  const timeoutMs = 8000;
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  const turnSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
   try {
     console.log(`[LedgerLens AI] Contacting ${provider.name} (model: ${provider.model})...`);
     const response = await fetch(provider.endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${provider.apiKey}` },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${provider.apiKey}`,
+        "User-Agent": "LedgerLens/1.0",
+        ...(provider.name === "Gemini" ? { "x-goog-api-key": provider.apiKey } : {}),
+      },
       body: JSON.stringify({
         model: provider.model,
         messages: [
@@ -242,11 +249,11 @@ async function executeLlmTurn(provider: LlmProvider, question: string, previous?
         tool_choice: "required",
         max_completion_tokens: 2048,
         // Routing needs a tool selection, not a long reasoning trace.
-        ...(provider.name === "Gemini" || provider.name === "Groq" && provider.model.startsWith("openai/gpt-oss-") ? { reasoning_effort: "low" } : {}),
+        ...(provider.name === "Groq" && provider.model.startsWith("openai/gpt-oss-") ? { reasoning_effort: "low" } : {}),
         temperature: 0.1,
       }),
       cache: "no-store",
-      signal,
+      signal: turnSignal,
     });
     if (!response.ok) {
       // Never print provider response bodies: they may contain user data or credentials.
@@ -299,7 +306,7 @@ async function executeLlmTurn(provider: LlmProvider, question: string, previous?
     return agentContextSchema.parse({ tool: call.name, ...validated.data });
   } catch {
     if (signal?.aborted) signal.throwIfAborted();
-    console.warn(`[LedgerLens AI] ${provider.name} routing request failed; trying fallback.`);
+    console.warn(`[LedgerLens AI] ${provider.name} routing request failed or timed out (${timeoutMs}ms); trying fallback.`);
     return null;
   }
 }

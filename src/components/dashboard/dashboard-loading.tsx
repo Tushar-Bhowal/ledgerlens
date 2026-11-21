@@ -63,16 +63,18 @@ function OverviewSkeleton() {
 
 function AssistantSkeleton() {
   return (
-    <div className="assistant-page" aria-hidden="true">
-      <div className="assistant-session"><Skeleton className="skeleton-label" /></div>
-      <div className="assistant-welcome">
-        <Skeleton className="skeleton-assistant-mark" />
-        <Skeleton className="skeleton-assistant-heading" />
-        <div className="assistant-prompts">
-          {Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="skeleton-control" />)}
+    <div className="flex flex-col flex-1 h-full max-h-full min-h-0 overflow-hidden relative bg-background text-foreground assistant-page" aria-hidden="true">
+      <div className="flex flex-none items-center justify-between min-h-[42px] px-3.5 sm:px-6 md:px-8 py-1"><Skeleton className="w-24 h-4 rounded-md" /></div>
+      <div className="flex-1 min-h-0 flex flex-col items-center justify-center py-8 md:py-12 px-4 text-center">
+        <Skeleton className="size-[50px] rounded-2xl mb-4" />
+        <Skeleton className="w-[min(400px,80vw)] h-[43px] rounded-xl mb-6" />
+        <div className="flex flex-wrap justify-center gap-2">
+          {Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="w-32 h-[42px] rounded-xl" />)}
         </div>
       </div>
-      <div className="composer-area"><Skeleton className="skeleton-composer" /></div>
+      <div className="flex-none w-full px-3.5 sm:px-6 pt-2.5 pb-[max(14px,env(safe-area-inset-bottom))] bg-background border-t border-border/50">
+        <div className="w-full max-w-[780px] mx-auto"><Skeleton className="w-full h-[108px] rounded-2xl" /></div>
+      </div>
     </div>
   );
 }

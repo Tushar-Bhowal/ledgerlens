@@ -6,11 +6,11 @@ export interface AiClientConfig {
   providerPriority: "auto" | "gemini" | "groq" | "system";
 }
 
-export const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
+export const DEFAULT_GEMINI_MODEL = "gemini-flash-lite-latest";
 export const DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b";
 
 export const GEMINI_MODEL_OPTIONS = [
-  { value: "gemini-3.8-flash", label: "gemini-3.8-flash" },
+  { value: "gemini-flash-lite-latest", label: "gemini-flash-lite-latest" },
   { value: "gemini-3.5-flash", label: "gemini-3.5-flash" },
   { value: "gemini-2.5-flash", label: "gemini-2.5-flash" },
 ];
@@ -23,7 +23,7 @@ export const GROQ_MODEL_OPTIONS = [
 export function resolveGeminiModel(model?: string): string {
   const selected = model?.trim().replace(/^models\//, "");
   // Migrate retired defaults from browser storage and older environment files.
-  if (!selected || ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"].includes(selected)) {
+  if (!selected || ["gemini-3.8-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"].includes(selected)) {
     return DEFAULT_GEMINI_MODEL;
   }
   return selected;

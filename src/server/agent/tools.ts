@@ -83,7 +83,7 @@ export async function toolReceivablesIncrease(month = 12): Promise<PreviewExampl
       })),
     },
     nextStep: `Review ${topDrivers[0]?.name ?? "top debtors"} and their overdue invoices. Open Period analysis to distinguish new postings, settlements and movements between ageing buckets.`,
-    limitation: "Ageing exposure can increase when balances move into older buckets. Received cash and allocated cash are different flows. Figures originate from PostgreSQL services; incomplete or unreconciled movements are withheld.",
+    limitation: "Ageing exposure can increase when balances move into older buckets. Received cash and allocated cash are different flows. Figures originate from live database records; incomplete or unreconciled movements are withheld.",
     evidence: [
       { label: `Open ${monthLabel} period analysis`, caption: "Movements, due cohorts, customer drivers and source links", href: "/receivables?view=period" },
       { label: "Open full balance trend", caption: "Jan–Dec 2025 month-end comparison", href: "/#balance-trend-title" },
@@ -252,7 +252,7 @@ export async function toolCustomerRisk(customerId?: string): Promise<PreviewExam
       })),
     },
     nextStep: "Review the profile's payment history, dated follow-ups and invoice disputes. Confirm conflicting master terms with the owner.",
-    limitation: "This analysis is retrieved dynamically from PostgreSQL. Current limits cannot establish historical limit revisions. The source risk-segment label does not determine the displayed priority.",
+    limitation: "This analysis is retrieved dynamically from the live database. Current limits cannot establish historical limit revisions. The source risk-segment label does not determine the displayed priority.",
     evidence: [
       { label: `Open ${target.name} risk profile`, caption: "Terms, source invoices, disputes and follow-up history", href: `/receivables?customer=${encodeURIComponent(target.id)}` },
     ],
