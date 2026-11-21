@@ -6,13 +6,13 @@ A Next.js, React, TypeScript and PostgreSQL application for the DDL Labs assignm
 
 - Six live screens: Overview, Receivables, Payables, Exceptions, Actions and Assistant.
 - Transactional schema migrations and snapshot ingestion with source-row references and rejection auditing.
-- Invoice/bill balances, partial allocations, evidence, configurable ageing, historical balances, daily/monthly movements, concentration, settlement timing and explicitly labelled billing-based days proxies.
+- Invoice/bill balances, partial allocations, evidence, configurable ageing by original, due, posting or last-transaction date, historical balances, daily/monthly movements, concentration, settlement timing and explicitly labelled billing-based days proxies.
 - Customer risk, historical customer due-cohort shortfalls, cumulative gaps, overdue trends and a labelled next-month balance illustration.
 - Collection opportunities, supplier control review and exceptions with traceable source references.
 - Read-only Assistant: validated tool calls, customer-name lookup, retained tool/reference context, live evidence follow-ups, provider fallback and cancellation.
 - PostgreSQL-backed request and concurrency limits shared across application instances.
 
-Implementation is not a claim of universal accuracy. The approved isolated verification passes 28 focused checks. Live model access/quota, browser/mobile/keyboard/microphone behaviour and public deployment have not been verified in that suite.
+Implementation is not a claim of universal accuracy. The approved isolated verification passes 38 focused checks. A separate live Gemini smoke check confirmed five model-selected tools and the direct customer-risk path against local PostgreSQL. Browser/mobile/keyboard/microphone behaviour, other real providers, sustained quota and public deployment remain unverified.
 
 ## Financial snapshot
 
@@ -28,7 +28,7 @@ Verified against an isolated PostgreSQL import of the supplied CSVs on 21 Novemb
 | Capped disputed overdue | ₹92,635.23 |
 | Actionable overdue | ₹3,24,79,347.38 |
 | Posted payments pending approval | 51 |
-| Current exception observations | 487 across 10 populated categories |
+| Current exception observations | 489 across 11 populated categories |
 
 An exception count is a count of rule observations, not unique transactions or additive financial exposure. Counts change when source data or validated rules change.
 
@@ -62,7 +62,9 @@ Configure `GEMINI_API_KEY`, `GROQ_API_KEY` or `OPENAI_API_KEY` on the server. De
 
 AI Config also accepts user-supplied Gemini/Groq keys and retrieves account model catalogs through server-side POST requests. Saved keys persist in this browser's localStorage until cleared. Catalog visibility is not proof of completion/tool-calling access or available quota. Credentials are not included in source code or application logs.
 
-A model selects an allowlisted financial tool or clarification action. Arguments are validated; PostgreSQL services compute facts. Financial replies use deterministic service wording rather than an unvalidated model rewrite. Follow-up context contains source references, not trusted amounts. The current chat implementation gives each provider eight seconds before trying the next provider or deterministic route. This conflicts with the requested Gemini wait behavior and remains open. Stop cancels provider work; database queries keep their own timeout. Hosting platforms and network transports may still impose limits. Active request-limit leases renew while the provider is working.
+A model selects an allowlisted financial tool or clarification action. Arguments are validated; PostgreSQL services compute facts. Financial replies use deterministic service wording rather than an unvalidated model rewrite. Follow-up context contains source references, not trusted amounts. Gemini waits for a response, provider error or caller cancellation without an application timeout. Groq and OpenAI retain an eight-second provider deadline before fallback. Stop cancels provider work; database queries keep their own timeout. Hosting platforms and network transports may still impose limits. Active request-limit leases renew while the provider is working.
+
+Period analysis supports a single 2025 month or two adjacent month-end balances. Nonconsecutive comparisons, partial-date ranges and unsupported relative periods ask for clarification rather than substituting another period. Cash-only investigations load original receipt/payment headers, full allocation audit and source CSV locations; effective balances use the shared reporting cutoff.
 
 Shared limits allow 10 requests per minute and 2 concurrent requests per client identity, with a global 20-request concurrency cap. Vercel's forwarded client identity is trusted automatically. Set `TRUST_PROXY_HEADERS=true` only behind a proxy that overwrites forwarded headers; other environments share a conservative local identity. Public authentication and per-user authorization are not implemented; use access controls before exposing confidential datasets.
 
@@ -76,9 +78,10 @@ Successful financial responses use `Cache-Control: no-store`.
 | GET `/api/finance/summary` | Balances, cash residuals, source counts, pending approvals |
 | GET `/api/finance/documents?ledger=ar\|ap` | Validated search, status, pagination and sorting |
 | GET `/api/finance/documents/[id]?ledger=ar\|ap` | Source evidence, including inactive audit documents |
+| GET `/api/finance/cash/[id]` | Original ARR/APP cash header, approval status, allocation audit and cutoff residual |
 | GET `/api/finance/customers?customerId=C030` | Global overdue priorities or a specific master profile |
 | GET `/api/finance/history` | Twelve reconstructed monthly closes |
-| GET `/api/finance/ageing?ledger=ar&basis=due&boundaries=30,60,90` | Configurable ageing by original/due date |
+| GET `/api/finance/ageing?ledger=ar&basis=due&boundaries=30,60,90` | Configurable ageing by original/due/posting/last-transaction date |
 | GET `/api/finance/analysis?ledger=ar&month=3` | Actual opening/closing bridge, cohorts, daily movements, drivers |
 | GET `/api/finance/measures?ledger=ar\|ap` | Coverage-aware measures, timing and concentration |
 | GET `/api/finance/opportunities` | Deduplicated collections, cash matching and supplier review |
@@ -117,6 +120,7 @@ The integration runner refuses remote/nonverification databases. Adversarial fin
 - [Data mapping](docs/data-mapping.md)
 - [Actual verification report](docs/test-report.md)
 - [Executive summary](docs/executive-summary.md)
-- [Presentation content](docs/presentation.md)
+- [Final presentation](docs/LedgerLens_Final.pptx)
+- [Presentation brief](docs/presentation.md)
 
-The supplied dataset is synthetic and included for reproducibility. No public application URL has been recorded. `docs/presentation.md` is a brief for producing the final PowerPoint with actual scenario screenshots. Live provider validation and final presentation review remain pending.
+The supplied dataset is synthetic and included for reproducibility. No public application URL has been recorded. The final eight-slide deck is `docs/LedgerLens_Final.pptx`; its content, speaker notes and file structure were reviewed against the implementation and verification report. Full rendered-slide layout inspection was not completed. The live Gemini code checks and their limits are recorded in the test report.

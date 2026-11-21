@@ -37,6 +37,7 @@ export type BillPaymentReview = {
   status: string;
   hasHold: boolean;
   hasDispute: boolean;
+  approvalWarnings: { id: string; status: string | null; sourceFilename: string; sourceRecordNumber: number }[];
   eligible: boolean;
   priorityScore: number;
 };
@@ -67,7 +68,7 @@ function numericAmount(value: string): number {
 }
 
 type OpportunitySource = { id: string; number: string | null; party_id: string; party: string; due: string; face: string; outstanding: string; disputed: string; actionable: string };
-type PaymentSource = { id: string; number: string | null; party_id: string; party: string; due: string; outstanding: string; criticality: string | null; terms_days: number | null; msme: boolean | null; has_hold: boolean; has_dispute: boolean; days_overdue: number };
+type PaymentSource = { id: string; number: string | null; party_id: string; party: string; due: string; outstanding: string; criticality: string | null; terms_days: number | null; msme: boolean | null; has_hold: boolean; has_dispute: boolean; approval_warnings: BillPaymentReview["approvalWarnings"]; days_overdue: number };
 
 export async function getOpportunities(): Promise<OpportunitiesResult> {
   // All review queues come from one snapshot, so concurrent imports cannot mix different datasets.
@@ -98,6 +99,12 @@ export async function getOpportunities(): Promise<OpportunitiesResult> {
     ), ap AS (
       WITH ${documentBalancesSql("ap")}, controls AS (
         SELECT b.id,
+          coalesce((SELECT json_agg(json_build_object('id', p.payment_id, 'status', p.approval_status,
+            'sourceFilename', p.source_filename, 'sourceRecordNumber', p.source_record_number) ORDER BY p.payment_id)
+            FROM finance.ap_payments p WHERE p.vendor_id = b.party_id AND p.status = 'Posted'
+              AND p.payment_date <= $1::date AND p.approval_status IS DISTINCT FROM 'Approved'
+              AND EXISTS (SELECT 1 FROM finance.ap_payment_allocations a WHERE a.payment_id = p.payment_id
+                AND a.bill_id = b.id AND a.status = 'Allocated' AND a.allocation_date <= $1::date)), '[]'::json) AS approval_warnings,
           EXISTS (SELECT 1 FROM finance.payment_holds h WHERE h.bill_id = b.id AND h.vendor_id = b.party_id
             AND h.hold_date <= $1::date AND (h.released_date > $1::date OR (h.released_date IS NULL AND h.hold_status = 'Active'))) AS has_hold,
           EXISTS (SELECT 1 FROM finance.disputes d WHERE d.bill_id = b.id AND d.party_type = 'Vendor' AND d.party_id = b.party_id
@@ -113,7 +120,7 @@ export async function getOpportunities(): Promise<OpportunitiesResult> {
               OR (d.status IN ('Open', 'Under Review') AND (d.raised_date IS NULL OR b.date IS NULL)))) AS controls_incomplete
         FROM balances b
       )
-      SELECT b.*, c.has_hold, c.has_dispute, c.controls_incomplete,
+      SELECT b.*, c.has_hold, c.has_dispute, c.approval_warnings, c.controls_incomplete,
         ($1::date - b.due)::integer AS days_overdue
       FROM balances b JOIN controls c ON c.id = b.id
     ), cash AS (
@@ -126,7 +133,7 @@ export async function getOpportunities(): Promise<OpportunitiesResult> {
       ORDER BY actionable DESC, id) FROM ar WHERE status = 'overdue' AND outstanding > 0), '[]'::json) AS ar,
       coalesce((SELECT json_agg(json_build_object('id', id, 'number', number, 'party_id', party_id, 'party', party,
         'due', due::text, 'outstanding', outstanding::text, 'criticality', criticality, 'terms_days', terms_days,
-        'msme', msme, 'has_hold', has_hold, 'has_dispute', has_dispute, 'days_overdue', days_overdue))
+        'msme', msme, 'has_hold', has_hold, 'has_dispute', has_dispute, 'approval_warnings', approval_warnings, 'days_overdue', days_overdue))
         FROM ap WHERE outstanding > 0), '[]'::json) AS ap,
       coalesce((SELECT json_agg(json_build_object('id', id, 'party_id', party_id, 'party_name', party_name,
         'unallocated', unallocated::text) ORDER BY unallocated DESC, id) FROM cash WHERE unallocated > 0), '[]'::json) AS cash,
@@ -149,14 +156,14 @@ export async function getOpportunities(): Promise<OpportunitiesResult> {
     step: numericAmount(row.disputed) > 0 ? "Resolve the dispute; follow up on the undisputed balance." : "Confirm allocations and agree a collection date.",
   }));
   const paymentReview = data.ap.map((row): BillPaymentReview => {
-    const eligible = !row.has_hold && !row.has_dispute;
+    const eligible = !row.has_hold && !row.has_dispute && row.approval_warnings.length === 0;
     const score = (eligible ? 1000 : 0) + (row.criticality?.toLowerCase() === "critical" ? 500 : 0)
       + (row.msme ? 300 : 0) + Math.max(0, row.days_overdue);
     return { id: row.id, number: row.number || row.id, vendorId: row.party_id, vendorName: row.party,
       due: row.due, outstanding: numericAmount(row.outstanding), criticality: row.criticality ?? "Unknown",
       msme: row.msme === true, termsDays: row.terms_days,
-      status: row.has_hold ? "On Hold" : row.has_dispute ? "In Dispute" : row.days_overdue > 0 ? "Overdue" : "Current",
-      hasHold: row.has_hold, hasDispute: row.has_dispute, eligible, priorityScore: score };
+      status: row.approval_warnings.length > 0 ? "Payment approval review" : row.has_hold ? "On Hold" : row.has_dispute ? "In Dispute" : row.days_overdue > 0 ? "Overdue" : "Current",
+      hasHold: row.has_hold, hasDispute: row.has_dispute, approvalWarnings: row.approval_warnings, eligible, priorityScore: score };
   }).sort((a, b) => Number(b.eligible) - Number(a.eligible) || b.priorityScore - a.priorityScore || a.due.localeCompare(b.due) || a.id.localeCompare(b.id));
   return { asOf: reportingDate, opportunities, paymentReview,
     unallocated: data.cash.map((row) => ({ id: row.id, partyId: row.party_id, partyName: row.party_name, amount: numericAmount(row.unallocated) })),

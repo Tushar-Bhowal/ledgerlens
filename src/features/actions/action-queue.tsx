@@ -67,13 +67,13 @@ export function ActionQueue() {
   const paymentActions: ActionItem[] = (liveOpp?.paymentReview ?? []).slice(0, 15).map((rev) => ({
     id: `PAY-${rev.id}`,
     kind: "Payment review",
-    priority: rev.hasHold || rev.criticality === "Critical" ? "High" : "Review",
+    priority: rev.approvalWarnings.length > 0 || rev.hasHold || rev.criticality === "Critical" ? "High" : "Review",
     party: rev.vendorName,
     source: rev.number,
     href: `/payables?bill=${rev.id}`,
     amount: rev.outstanding,
-    reason: rev.hasHold ? "Payment hold active on bill." : rev.hasDispute ? "Unresolved supplier dispute." : `${rev.criticality} supplier obligation.`,
-    next: rev.eligible ? "Review payment terms and schedule disbursement." : "Resolve hold/dispute control before approval.",
+    reason: rev.approvalWarnings.length > 0 ? `Related posted payment approval requires review: ${rev.approvalWarnings.map((p) => p.id).join(", ")}.` : rev.hasHold ? "Payment hold active on bill." : rev.hasDispute ? "Unresolved supplier dispute." : `${rev.criticality} supplier obligation.`,
+    next: rev.eligible ? "Review payment terms and schedule disbursement." : "Resolve payment approval, hold or dispute controls before scheduling.",
   }));
 
   const rows: ActionItem[] = [...collectionActions, ...paymentActions].sort((a, b) =>

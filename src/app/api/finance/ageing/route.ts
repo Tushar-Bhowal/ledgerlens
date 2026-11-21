@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   const raw = params.get("boundaries") ?? "30,60,90";
   const parts = raw.split(",");
   const boundaries = parts.map(Number);
-  if ((ledger !== "ar" && ledger !== "ap") || (basis !== "due" && basis !== "date")
+  if ((ledger !== "ar" && ledger !== "ap") || (basis !== "due" && basis !== "date" && basis !== "posted" && basis !== "last")
     || parts.length !== 3 || parts.some((part) => !/^\d{1,4}$/.test(part))
     || boundaries.some((value) => value < 1 || value > 3650)
     || boundaries[0] >= boundaries[1] || boundaries[1] >= boundaries[2]) {

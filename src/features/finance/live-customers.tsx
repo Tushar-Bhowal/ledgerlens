@@ -12,6 +12,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { CustomerActivityHistory } from "./customer-activity";
 import { LiveDocuments } from "./live-documents";
 
 type Customer = {
@@ -27,6 +28,8 @@ type Customer = {
   limit: string | null;
   outstanding: string | null;
   paymentDays: string | null;
+  creditPeriodDays: number | null;
+  paymentTerms: string | null;
   priority: string;
   reasons: string[];
 };
@@ -104,7 +107,7 @@ export function LiveCustomers({ customerId }: { customerId?: string }) {
           ]}
           pageSize={8} />
       )}
-      {customerId && rows !== null && !error && !selected && <p className="finance-validation" role="status">The requested customer was not found in the reporting scope. Choose a customer from the live table.</p>}
+      {customerId && rows !== null && !error && !rows.some((row) => row.id === customerId) && <p className="finance-validation" role="status">The requested customer was not found in the reporting scope. Choose a customer from the live table.</p>}
       <Dialog open={Boolean(selected)} onOpenChange={(open) => { if (!open) setSelected(null); }}>
         <DialogContent
           className="sm:max-w-7xl w-[min(calc(100vw-2rem),80rem)] max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden border border-border bg-card shadow-2xl rounded-2xl"
@@ -167,11 +170,12 @@ export function LiveCustomers({ customerId }: { customerId?: string }) {
                 </div>
 
                 <div className="p-3.5 rounded-xl bg-accent/40 border border-border text-xs leading-relaxed text-muted-foreground">
-                  Historical credit limits are unavailable. The table below lists all live customer invoices, cash allocations, and signed adjustments for <strong className="text-foreground">{selected.name}</strong> as of 31 Dec 2025.
+                  Credit period: {selected.creditPeriodDays === null ? "Unavailable" : `${selected.creditPeriodDays} days`} · Terms: {selected.paymentTerms ?? "Unavailable"}. Historical credit limits are unavailable. The table below lists all live customer invoices, cash allocations, and signed adjustments for <strong className="text-foreground">{selected.name}</strong> as of 31 Dec 2025.
                 </div>
 
                 <div className="min-w-0">
                   <LiveDocuments key={selected.id} ledger="ar" partyId={selected.id} nested />
+                  <CustomerActivityHistory key={`activity-${selected.id}`} customerId={selected.id} />
                 </div>
               </div>
 

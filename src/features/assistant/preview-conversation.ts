@@ -109,9 +109,9 @@ export function usePreviewConversation() {
     const aiConfig = typeof window !== "undefined" ? getStoredAiConfig() : null;
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (aiConfig?.geminiApiKey) headers["x-gemini-key"] = aiConfig.geminiApiKey;
-    if (aiConfig?.geminiModel) headers["x-gemini-model"] = aiConfig.geminiModel;
+    if (aiConfig?.geminiModelConfigured && aiConfig.geminiModel) headers["x-gemini-model"] = aiConfig.geminiModel;
     if (aiConfig?.groqApiKey) headers["x-groq-key"] = aiConfig.groqApiKey;
-    if (aiConfig?.groqModel) headers["x-groq-model"] = aiConfig.groqModel;
+    if (aiConfig?.groqModelConfigured && aiConfig.groqModel) headers["x-groq-model"] = aiConfig.groqModel;
     if (aiConfig?.providerPriority) headers["x-ai-provider"] = aiConfig.providerPriority;
 
     fetch("/api/assistant/chat", {

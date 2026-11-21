@@ -21,7 +21,7 @@ type Result =
   | { state: "ready"; data: Ageing };
 
 export function LiveAgeing({ ledger }: { ledger: "ar" | "ap" }) {
-  const [basis, setBasis] = useState<"due" | "date">("due");
+  const [basis, setBasis] = useState<"due" | "date" | "posted" | "last">("due");
   const [boundaries, setBoundaries] = useState([30, 60, 90]);
   const [draft, setDraft] = useState(["30", "60", "90"]);
   const [validation, setValidation] = useState("");
@@ -63,7 +63,7 @@ export function LiveAgeing({ ledger }: { ledger: "ar" | "ap" }) {
     <section className="panel finance-panel">
       <header className="finance-panel-heading"><div><h2>{ledger === "ar" ? "Receivable" : "Payable"} ageing</h2><p>Positive balances{result.state === "ready" && ` as of ${result.data.asOf}`}</p></div></header>
       <div className="finance-controls">
-        <label>Ageing basis<select value={basis} onChange={(event) => { setResult({ state: "loading" }); setBasis(event.target.value as "due" | "date"); }}><option value="due">Due date</option><option value="date">Original document date</option></select></label>
+        <label>Ageing basis<select value={basis} onChange={(event) => { setResult({ state: "loading" }); setBasis(event.target.value as "due" | "date" | "posted" | "last"); }}><option value="due">Due date</option><option value="date">Original document date</option><option value="posted">Posting date</option><option value="last">Last transaction date</option></select></label>
         <form onSubmit={(event) => { event.preventDefault(); apply(); }} className="bucket-form">
           <fieldset><legend>Bucket end days</legend>{draft.map((value, index) => <input key={index} type="number" aria-label={`Bucket ${index + 1} end day`} value={value} min={1} max={3650} onChange={(event) => setDraft((previous) => previous.map((old, i) => i === index ? event.target.value : old))} />)}</fieldset>
           <button type="submit" className="table-tool-button">Apply</button>
@@ -92,7 +92,7 @@ export function LiveAgeing({ ledger }: { ledger: "ar" | "ap" }) {
       <h3>Source documents</h3>
       <p className="footnote">Open a document to review its balance and allocations. The list includes all statuses; it is not filtered to a specific ageing bucket.</p>
       {result.state === "loading" ? <DataTableSkeleton columns={7} rows={5} /> : <LiveDocuments ledger={ledger} />}
-      <p className="footnote">Original document dates remain fixed after partial settlement. Due today counts as current. Unallocated cash is excluded from document settlement.</p>
+      <p className="footnote">Original document dates remain fixed after partial settlement. Last transaction means the latest posting, eligible allocation or posted adjustment date through the reporting cutoff. Cancelled, reversed and future cash does not reset ageing. Due today counts as current. Unallocated cash is excluded from document settlement.</p>
     </section>
   );
 }

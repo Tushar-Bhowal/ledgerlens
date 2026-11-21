@@ -2,6 +2,7 @@ import "server-only";
 import { findCustomers } from "@/server/finance/customer-lookup";
 import { getShortPaymentCustomers } from "@/server/finance/short-payments";
 import { getPeriodAnalysis } from "@/server/finance/analysis";
+import { getCustomerActivity } from "@/server/finance/customer-activity";
 import { getCustomerPriorities } from "@/server/finance/customer-priorities";
 import { getOpportunities } from "@/server/finance/opportunities";
 import { getExceptions } from "@/server/finance/exceptions";
@@ -85,7 +86,7 @@ export async function toolReceivablesIncrease(month = 12): Promise<PreviewExampl
     nextStep: `Review ${topDrivers[0]?.name ?? "top debtors"} and their overdue invoices. Open Period analysis to distinguish new postings, settlements and movements between ageing buckets.`,
     limitation: "Ageing exposure can increase when balances move into older buckets. Received cash and allocated cash are different flows. Figures originate from live database records; incomplete or unreconciled movements are withheld.",
     evidence: [
-      { label: `Open ${monthLabel} period analysis`, caption: "Movements, due cohorts, customer drivers and source links", href: "/receivables?view=period" },
+      { label: `Open ${monthLabel} period analysis`, caption: "Movements, due cohorts, customer drivers and source links", href: `/receivables?view=period&month=${month}` },
       { label: "Open full balance trend", caption: "Jan–Dec 2025 month-end comparison", href: "/#balance-trend-title" },
     ],
   };
@@ -116,6 +117,8 @@ export async function toolCollectionAttention(): Promise<PreviewExample> {
     return unavailable("collections", "Collection priorities have incomplete source coverage; affected amounts cannot be stated reliably.");
   }
 
+  const rankedInvoices = rows.slice(0, 5).flatMap((customer) => oppResult.opportunities.filter((invoice) => invoice.partyId === customer.id));
+
   return {
     id: "collections",
     topic: "Collections",
@@ -128,12 +131,12 @@ export async function toolCollectionAttention(): Promise<PreviewExample> {
       { label: "Leading customer's oldest due balance", value: `${leadingCustomer?.oldestDays ?? 0} days overdue` },
     ],
     table: {
-      title: "Collection priority list",
-      columns: ["Customer", "Collection portion", "Disputed portion"],
-      rows: rows.slice(0, 5).map((row) => ({
+      title: "Invoice actions for the five leading collection customers",
+      columns: ["Customer / invoice", "Due date", "Collection portion", "Disputed portion", "Action"],
+      rows: rankedInvoices.map((row) => ({
         id: row.id,
-        values: [row.name, formatLiveAmount(row.actionable), formatLiveAmount(row.disputed)],
-        href: `/receivables?customer=${encodeURIComponent(row.id)}`,
+        values: [`${row.party} · ${row.id} (${row.number})`, row.due, money(row.actionable), money(row.disputed), row.step],
+        href: `/receivables?invoice=${encodeURIComponent(row.id)}`,
       })),
     },
     nextStep: `Open ${leadingCustomer?.name ?? "debtor"}, inspect its overdue invoices and coordinate with the collection owner. Route disputed portions for resolution.`,
@@ -220,7 +223,10 @@ export async function toolCustomerRisk(customerId?: string): Promise<PreviewExam
     };
   }
 
-  const docList = await listDocuments("ar", 1, 5, "", "overdue", target.id, "outstanding", "desc");
+  const [docList, activity] = await Promise.all([
+    listDocuments("ar", 1, 5, "", "overdue", target.id, "outstanding", "desc"),
+    getCustomerActivity(target.id),
+  ]);
 
   const limit = target.limit === null ? null : amountCents(target.limit);
   const utilization = target.outstanding !== null && limit !== null && limit > 0n
@@ -241,6 +247,9 @@ export async function toolCustomerRisk(customerId?: string): Promise<PreviewExam
       { label: "Oldest past due", value: `${target.oldestDays} days` },
       { label: "Actual settlement days", value: target.paymentDays ? `${Number(target.paymentDays).toFixed(1)} days` : "Unavailable" },
       { label: "Actionable collection amount", value: formatLiveAmount(target.actionable) },
+      { label: "Source receipts / disputes / follow-ups", value: ["Receipt", "Dispute", "Follow-up"].map((kind) => `${activity.events.filter((event) => event.kind === kind).length} ${kind.toLowerCase()} records`).join(" · ") },
+      { label: "Activity needing chronology/source review", value: String(activity.events.filter((event) => event.warning).length) },
+      ...activity.events.filter((event) => event.kind !== "Receipt").slice(0, 4).map((event) => ({ label: `${event.kind} ${event.id} · ${event.date ?? "Date unavailable"}`, value: `${event.status ?? "Unknown"} · ${event.detail ?? "No detail"}${event.warning ? ` · ${event.warning}` : ""} · ${event.sourceFilename} record ${event.sourceRecordNumber}` })),
     ],
     table: {
       title: `Leading overdue source invoices for ${target.name}`,
@@ -274,11 +283,12 @@ export async function toolVendorPriorities(): Promise<PreviewExample> {
     topic: "Payables",
     question: "Which vendor payments should be prioritised?",
     aliases: ["Vendor payments", "Which vendor payments should be prioritized?", "Show payment priorities", "Show vendor holds"],
-    answer: `There are ${eligibleBills.length} open supplier bills eligible for scheduling review and ${blockedBills.length} requiring control review. Eligible bills are ranked by overdue status, vendor criticality, the source MSME flag, and balance.`,
+    answer: `There are ${eligibleBills.length} open supplier bills eligible for scheduling review and ${blockedBills.length} requiring control review. Eligible bills are ranked by a score for vendor criticality, the source MSME flag and days overdue, then due date and bill ID.`,
     facts: [
       { label: "Eligible outstanding for review", value: formatLiveAmount(decimalAmount(eligibleSum)) },
       { label: "Outstanding needing control review", value: formatLiveAmount(decimalAmount(blockedSum)) },
-      { label: "Payment policy", value: "Posted allocations count; pending approval remains a separate exception" },
+      { label: "Related posted payments requiring approval review", value: [...new Set(blockedBills.flatMap((bill) => bill.approvalWarnings.map((payment) => payment.id)))].join(", ") || "None" },
+      { label: "Payment policy", value: "Posted allocations count; related payments without approved status require control review" },
     ],
     table: {
       title: "Leading eligible bills for human review",
@@ -290,7 +300,7 @@ export async function toolVendorPriorities(): Promise<PreviewExample> {
       })),
     },
     nextStep: "Open Payment review, inspect terms and controls, and have the responsible finance manager decide the schedule.",
-    limitation: "Eligibility depends strictly on verified source controls. Guardrail: No payment initiation or ledger change is permitted from this decision-support agent.",
+    limitation: "Eligibility depends on verified source controls, including related posted-payment approval warnings; bill-level approval was not supplied. Guardrail: No payment initiation or ledger change is permitted from this decision-support agent.",
     evidence: [
       { label: "Open payment priorities and blocked obligations", caption: "Filter by review status and inspect allocations", href: "/payables?view=priorities" },
       { label: "Open the action queue", caption: "Collection and payment-control next steps", href: "/actions" },
@@ -299,8 +309,27 @@ export async function toolVendorPriorities(): Promise<PreviewExample> {
 }
 
 // Tool 6: Investigate a Financial Exception
-export async function toolInvestigateException(issueId?: string): Promise<PreviewExample> {
+export async function toolInvestigateException(issueId?: string, exceptionCategory?: "duplicates"): Promise<PreviewExample> {
   const excResult = await getExceptions();
+  if (!issueId) {
+    const candidates = exceptionCategory === "duplicates"
+      ? excResult.rows.filter((issue) => /duplicate|reference collision/i.test(issue.kind))
+      : excResult.rows;
+    return {
+      id: "exception", topic: "Exceptions", question: "Choose a financial exception", aliases: [],
+      answer: candidates.length
+        ? `${candidates.length} ${exceptionCategory === "duplicates" ? "duplicate or reference-collision review leads" : "financial exceptions"} match. Choose a specific issue to inspect its supporting records.`
+        : "No matching exception exists in the current reporting scope.",
+      facts: [{ label: "Matching issues", value: String(candidates.length) }],
+      table: {
+        title: "Choose an issue to investigate", columns: ["Issue", "Type", "Affected party"],
+        rows: candidates.slice(0, 10).map((issue) => ({ id: issue.id, values: [issue.id, issue.kind, issue.party], href: `/exceptions?issue=${encodeURIComponent(issue.id)}` })),
+      },
+      nextStep: "Ask to investigate one of the listed issue IDs, or open its evidence drawer.",
+      limitation: "A reference collision is an investigation lead, not proof of duplicate liability or fraud. Issue exposures can overlap.",
+      evidence: [{ label: "Open exception register", caption: "Inspect an exact issue and its source records", href: "/exceptions" }],
+    };
+  }
   const matches = issueId ? excResult.rows.filter((issue) => issue.id.toUpperCase() === issueId.toUpperCase() || issue.evidence.some((reference) => reference.toUpperCase() === issueId.toUpperCase())) : [];
   if (issueId && matches.length !== 1 || !issueId && excResult.rows.length === 0) {
     return {

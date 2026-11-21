@@ -41,7 +41,7 @@ export function documentBalancesSql(ledger: Ledger, includeAudit = false) {
     ), allocation_totals AS (
       -- Sum the eligible portion for each invoice or bill at the reporting date.
       SELECT a.${id} AS document_id,
-        SUM(a.allocated_amount_inr) AS paid,
+        SUM(a.allocated_amount_inr) AS paid, MAX(a.allocation_date) AS last_allocation,
         BOOL_OR(a.allocated_amount_inr IS NULL OR a.allocated_amount_inr < 0
           OR c.${party} <> d.${party} OR c.${cashAmount} IS NULL OR t.allocated > c.${cashAmount} OR t.invalid
           OR a.allocation_date < c.${cashDate} OR a.allocation_date < d.posting_date) AS invalid
@@ -55,6 +55,7 @@ export function documentBalancesSql(ledger: Ledger, includeAudit = false) {
     ), adjustment_totals AS (
       -- A credit reduces the balance; a debit increases it. Keep this sum separate from allocations.
       SELECT a.${id} AS document_id,
+        MAX(a.adjustment_date) AS last_adjustment,
         SUM(CASE a.adjustment_type WHEN 'Credit Note' THEN -a.amount_inr WHEN 'Debit Note' THEN a.amount_inr END) AS adjustment,
         BOOL_OR(a.amount_inr IS NULL OR a.amount_inr < 0 OR a.adjustment_type NOT IN ('Credit Note', 'Debit Note') OR a.adjustment_type IS NULL OR a.${party} <> d.${party}
           OR a.adjustment_date < d.posting_date) AS invalid
@@ -88,6 +89,7 @@ export function documentBalancesSql(ledger: Ledger, includeAudit = false) {
         CASE WHEN COALESCE(a.invalid, false) OR u.document_id IS NOT NULL THEN NULL ELSE COALESCE(a.paid, 0) END AS paid,
         CASE WHEN COALESCE(j.invalid, false) OR u.document_id IS NOT NULL THEN NULL ELSE COALESCE(j.adjustment, 0) END AS adjustment,
         d.source_filename, d.source_record_number,
+        GREATEST(d.posting_date, a.last_allocation, j.last_adjustment) AS last_transaction,
         CASE WHEN d.${amount} IS NULL OR d.posting_date IS NULL OR d.posting_date > $1::date OR d.status IS DISTINCT FROM 'Posted' OR d.currency IS DISTINCT FROM 'INR'
             OR d.posting_date < d.${originalDate} OR d.due_date < d.${originalDate}
             OR COALESCE(a.invalid, false) OR COALESCE(j.invalid, false) OR u.document_id IS NOT NULL

@@ -1,8 +1,10 @@
 export interface AiClientConfig {
   geminiApiKey: string;
   geminiModel: string;
+  geminiModelConfigured?: boolean;
   groqApiKey: string;
   groqModel: string;
+  groqModelConfigured?: boolean;
   providerPriority: "auto" | "gemini" | "groq" | "system";
 }
 
@@ -66,8 +68,10 @@ export function getStoredAiConfig(): AiClientConfig {
     return {
       geminiApiKey: parsed.geminiApiKey || "",
       geminiModel: resolveGeminiModel(parsed.geminiModel),
+      geminiModelConfigured: typeof parsed.geminiModel === "string" && Boolean(parsed.geminiModel.trim()),
       groqApiKey: parsed.groqApiKey || "",
       groqModel: resolveGroqModel(parsed.groqModel),
+      groqModelConfigured: typeof parsed.groqModel === "string" && Boolean(parsed.groqModel.trim()),
       providerPriority: parsed.providerPriority || "auto",
     };
   } catch {

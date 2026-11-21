@@ -9,6 +9,7 @@ import { StateMessage } from "@/components/ui/state-message";
 import { EvidenceDrawer } from "@/components/dashboard/evidence-drawer";
 import { money } from "@/lib/demo-data";
 import type { ExceptionItem } from "@/server/finance/exceptions";
+import { CashEvidenceDetail } from "@/features/finance/cash-evidence";
 
 function sourceHref(id: string) {
   if (/^ARI\d{5}$/.test(id)) return `/receivables?invoice=${encodeURIComponent(id)}`;
@@ -118,6 +119,7 @@ export function ExceptionExplorer({ issueId }: { issueId?: string }) {
           <p className="footnote">{selected.action}</p>
           <h3>Source references</h3>
           {selected.evidence.map((id) => {
+            if (/^(ARR|APP)\d{5}$/.test(id)) return <CashEvidenceDetail key={id} cashId={id} />;
             const href = sourceHref(id);
             return href
               ? <Link className="allocation evidence-text-link" key={id} href={href}>{id}</Link>

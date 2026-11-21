@@ -15,12 +15,16 @@ delete process.env.GEMINI_API_KEY;
 delete process.env.GROQ_API_KEY;
 const { getDatabasePool } = await import("../src/server/db");
 const { getFinanceSummary } = await import("../src/server/finance/summary");
+const { getCashEvidence } = await import("../src/server/finance/cash-evidence");
+const { GET: getCashRoute } = await import("../src/app/api/finance/cash/[id]/route");
 const { listDocuments, getDocumentEvidence } = await import("../src/server/finance/documents");
 const { getBalanceHistory, getAgeing } = await import("../src/server/finance/history");
 const { getPeriodAnalysis } = await import("../src/server/finance/analysis");
 const { getMeasures } = await import("../src/server/finance/measures");
 const { getShortPaymentCustomers } = await import("../src/server/finance/short-payments");
 const { getCustomerPriorities } = await import("../src/server/finance/customer-priorities");
+const { getCustomerActivity } = await import("../src/server/finance/customer-activity");
+const { getStoredAiConfig } = await import("../src/lib/ai-client-config");
 const { getExceptions } = await import("../src/server/finance/exceptions");
 const { getOpportunities } = await import("../src/server/finance/opportunities");
 const { processAgentMessage } = await import("../src/server/agent/chat");
@@ -107,8 +111,8 @@ try {
         for (const day of period.daily) assert.equal(cents(day.opening!) + cents(day.posted!) - cents(day.applied!) + cents(day.adjustments!), cents(day.closing!));
       }
     });
-    await check(`${ledger}: configurable date/due ageing and measures preserve supported scope`, async () => {
-      for (const basis of ["date", "due"] as const) {
+    await check(`${ledger}: configurable ageing bases and measures preserve supported scope`, async () => {
+      for (const basis of ["date", "due", "posted", "last"] as const) {
         const ageing = await getAgeing(ledger, basis, [15, 45, 120]);
         assert.equal(ageing.buckets.reduce((total, row) => total + cents(row.amount!), 0n), cents(ageing.total!));
       }
@@ -163,6 +167,55 @@ try {
     assert.ok(document.sourceRecordNumber > 0 && document.allocations.length > 0);
     const listed = await listDocuments("ar", 1, 10, "ARI00003", "all", "", "number", "asc");
     assert.equal(listed.rows[0].outstanding, document.outstanding);
+  });
+  await check("cash evidence exposes original header and allocation sources with canonical residuals", async () => {
+    const receipt = await getCashEvidence("arr00396");
+    assert.ok(receipt); assert.equal(receipt.id, "ARR00396"); assert.equal(receipt.ledger, "ar");
+    const source = receipts.find((row) => row.receipt_id === receipt.id)!;
+    assert.equal(receipt.reference, source.receipt_reference); assert.equal(receipt.partyId, source.customer_id);
+    assert.equal(receipt.date, source.receipt_date); assert.equal(cents(receipt.amount!), cents(source.receipt_amount_inr));
+    assert.equal(receipt.method, source.payment_mode); assert.equal(receipt.bankReference, source.bank_reference);
+    assert.equal(receipt.status, "Posted"); assert.equal(receipt.sourceFilename, "ar_receipts.csv");
+    assert.equal(receipt.sourceRecordNumber, receipts.indexOf(source) + 1);
+    assert.equal(cents(receipt.applied!), 0n); assert.equal(cents(receipt.unallocated!), 2500000n);
+    assert.deepEqual(receipt.allocations, []);
+    const payment = await getCashEvidence("APP00001");
+    assert.ok(payment); assert.equal(payment.ledger, "ap"); assert.equal(payment.approval, "Pending");
+    assert.equal(payment.status, "Posted"); assert.equal(payment.reference, "PAY-00001");
+    assert.equal(payment.bankReference, "PBK-00001"); assert.equal(payment.method, "RTGS");
+    assert.equal(payment.sourceFilename, "ap_payments.csv"); assert.equal(payment.sourceRecordNumber, 1);
+    assert.equal(cents(payment.amount!), 2828653n); assert.equal(cents(payment.applied!), 2828653n);
+    assert.equal(cents(payment.unallocated!), 0n);
+    assert.deepEqual(payment.allocations, [{ id: "APAL00001", documentId: "API00007", date: "2025-09-08", amount: "28286.53", status: "Allocated", sourceFilename: "ap_payment_allocations.csv", sourceRecordNumber: 1 }]);
+  });
+  await check("raw cash allocation audit remains separate from cutoff and source coverage amounts", async () => {
+    await fixture(`INSERT INTO finance.ar_receipt_allocations (allocation_id,receipt_id,invoice_id,allocation_date,allocated_amount_inr,status,source_filename,source_record_number)
+      SELECT 'ARAL99998','ARR00396',invoice_id,'2025-12-01',100,'Cancelled','verification',99998 FROM finance.ar_invoices WHERE customer_id='C003' ORDER BY invoice_id LIMIT 1;
+      INSERT INTO finance.ar_receipt_allocations (allocation_id,receipt_id,invoice_id,allocation_date,allocated_amount_inr,status,source_filename,source_record_number)
+      SELECT 'ARAL99999','ARR00396',invoice_id,'2026-01-01',100,'Allocated','verification',99999 FROM finance.ar_invoices WHERE customer_id='C003' ORDER BY invoice_id LIMIT 1`, async () => {
+      const evidence = (await getCashEvidence("ARR00396"))!;
+      assert.deepEqual(evidence.allocations.map((row) => row.id), ["ARAL99998", "ARAL99999"]);
+      assert.equal(evidence.allocations[0].status, "Cancelled"); assert.equal(evidence.allocations[1].date, "2026-01-01");
+      assert.equal(cents(evidence.applied!), 0n); assert.equal(cents(evidence.unallocated!), 2500000n);
+    });
+    for (const change of ["receipt_amount_inr=NULL", "status='Cancelled'", "receipt_date='2026-01-01'"]) {
+      await fixture(`UPDATE finance.ar_receipts SET ${change} WHERE receipt_id='ARR00396'`, async () => {
+        const evidence = (await getCashEvidence("ARR00396"))!;
+        assert.equal(evidence.id, "ARR00396"); assert.equal(evidence.applied, null); assert.equal(evidence.unallocated, null);
+      });
+    }
+    await fixture(`INSERT INTO finance.import_issues (source_filename,source_record_number,issue_code,reason,raw_record) VALUES ('verification',99999,'rejected','Verification coverage','{}')`, async () => {
+      const evidence = (await getCashEvidence("APP00001"))!;
+      assert.ok(evidence.rejectedRows > 0); assert.equal(evidence.applied, null); assert.equal(evidence.unallocated, null);
+      assert.equal(evidence.allocations[0].id, "APAL00001"); assert.equal(evidence.amount, "28286.53");
+    });
+  });
+  await check("cash evidence HTTP boundary validates IDs and distinguishes missing records", async () => {
+    for (const [id, expected] of [["ARR00396", 200], ["APP00001", 200], ["ARR99999", 404], ["ARI00003", 400], ["../ARR00396", 400], ["APP00001' OR 1=1", 400]] as const) {
+      const response = await getCashRoute(new Request("http://localhost/api/finance/cash/record"), { params: Promise.resolve({ id }) });
+      assert.equal(response.status, expected, id); assert.equal(response.headers.get("Cache-Control"), "no-store");
+      if (expected === 200) assert.equal((await response.json()).id, id);
+    }
   });
   await check("missing amounts propagate instead of becoming zero", async () => fixture("UPDATE finance.ar_invoices SET invoice_amount_inr=NULL WHERE invoice_id='ARI00003'", async () => {
     assert.equal((await getFinanceSummary()).receivables, null);
@@ -220,7 +273,178 @@ try {
       assert.equal(rows[0].id, "C999"); assert.equal(rows[0].outstanding, "0");
     });
   });
+  await check("duplicate requests filter review leads and preserve exact cross-party evidence", async () => {
+    const exceptions = await getExceptions();
+    for (const [ledger, reference, table, idKey, numberKey] of [["AR", "INV-00017", "ar_invoices", "invoice_id", "invoice_number"], ["AP", "BILL-00021", "ap_invoices", "bill_id", "bill_number"]]) {
+      const expected = csv(table).filter((row) => row[numberKey] === reference).map((row) => row[idKey]).sort();
+      const lead = exceptions.rows.find((row) => row.id.startsWith(`CROSS-${ledger}-`) && expected.every((id) => row.evidence.includes(id)));
+      assert.ok(lead, reference); assert.deepEqual([...lead.evidence].sort(), expected);
+      const exact = await processAgentMessage(`Investigate ${lead.id}`, undefined, { providerPriority: "system" });
+      assert.equal(exact.kind, "answer");
+      if (exact.kind === "answer") assert.equal(exact.context?.issueId, lead.id);
+    }
+    const duplicate = await processAgentMessage("Investigate duplicate invoices", undefined, { providerPriority: "system" });
+    assert.equal(duplicate.kind, "answer");
+    if (duplicate.kind === "answer") {
+      assert.equal(duplicate.context?.exceptionCategory, "duplicates");
+      assert.ok(duplicate.example.table?.rows.length);
+      for (const row of duplicate.example.table!.rows) assert.match(String(row.values[1]), /duplicate|reference collision/i);
+      const followup = await processAgentMessage("Show the evidence", duplicate.context, { providerPriority: "system" });
+      assert.equal(followup.kind, "answer");
+      if (followup.kind === "answer") assert.deepEqual(followup.example.table, duplicate.example.table);
+    }
+  });
+  await check("collection reply returns ranked invoice actions with exact capped portions", async () => {
+    const priorities = (await getCustomerPriorities()).rows as { id: string }[];
+    const opportunities = (await getOpportunities()).opportunities;
+    const expected = priorities.slice(0, 5).flatMap((customer) => opportunities.filter((invoice) => invoice.partyId === customer.id));
+    const reply = await processAgentMessage("Who needs collection attention today?", undefined, { providerPriority: "system" });
+    assert.equal(reply.kind, "answer");
+    if (reply.kind === "answer") {
+      assert.deepEqual(reply.example.table?.rows.map((row) => row.id), expected.map((row) => row.id));
+      for (const row of reply.example.table!.rows) {
+        const source = expected.find((invoice) => invoice.id === row.id)!;
+        assert.equal(new URL(row.href!, "http://localhost").searchParams.get("invoice"), source.id);
+        assert.ok(String(row.values[2]).includes(new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(source.actionable)));
+        assert.equal(row.values[4], source.step);
+        assert.equal(cents(source.actionable) + cents(source.disputed), cents(source.outstanding));
+      }
+    }
+  });
+  await check("customer activity retains source history and chronology without future leakage", async () => {
+    for (const id of ["C007", "C011", "C024"]) {
+      const activity = await getCustomerActivity(id);
+      const expectedIds = [...csv("disputes").filter((r) => r.party_type === "Customer" && r.party_id === id && (!r.raised_date || r.raised_date <= "2025-12-31")).map((r) => r.dispute_id), ...csv("collection_followups").filter((r) => r.customer_id === id && (!r.followup_date || r.followup_date <= "2025-12-31")).map((r) => r.followup_id), ...receipts.filter((r) => r.customer_id === id && (!r.receipt_date || r.receipt_date <= "2025-12-31")).map((r) => r.receipt_id)].sort();
+      assert.deepEqual(activity.events.map((event) => event.id).sort(), expectedIds);
+      for (const event of activity.events) {
+        assert.ok(event.sourceRecordNumber > 0 && event.sourceFilename.endsWith(".csv"));
+        for (const allocation of event.allocations) assert.ok(allocation.sourceRecordNumber > 0 && (!allocation.date || allocation.date <= "2025-12-31"));
+      }
+    }
+    assert.ok((await getCustomerActivity("C011")).events.find((event) => event.id === "FUP0003")?.warning);
+    await fixture(`INSERT INTO finance.ar_receipts (receipt_id,customer_id,receipt_date,receipt_amount_inr,status,source_filename,source_record_number) VALUES ('ARR99999','C024','2026-01-01',100,'Posted','verification',99999)`, async () => {
+      assert.ok(!(await getCustomerActivity("C024")).events.some((event) => event.id === "ARR99999"));
+    });
+  });
+  await check("related pending approval blocks scheduling review without changing settlement", async () => {
+    const evidence = await getDocumentEvidence("ap", "API00007");
+    const bill = (await getOpportunities()).paymentReview.find((row) => row.id === "API00007")!;
+    assert.ok(bill); assert.equal(bill.eligible, false);
+    assert.equal(cents(bill.outstanding), cents(evidence!.outstanding!));
+    const payment = bill.approvalWarnings.find((row) => row.id === "APP00001");
+    assert.ok(payment); assert.equal(payment.status, "Pending");
+    assert.equal(payment.sourceFilename, "ap_payments.csv"); assert.equal(payment.sourceRecordNumber, 1);
+    await fixture("UPDATE finance.ap_payments SET approval_status='Approved' WHERE payment_id='APP00001'", async () => {
+      assert.ok(!(await getOpportunities()).paymentReview.find((row) => row.id === "API00007")!.approvalWarnings.some((row) => row.id === "APP00001"));
+      assert.equal((await getDocumentEvidence("ap", "API00007"))!.outstanding, evidence!.outstanding);
+    });
+  });
+  await check("posting and last-transaction ageing reconcile to independent CSV bucket oracle", async () => {
+    for (const basis of ["posted", "last"] as const) {
+      const buckets = [0n, 0n, 0n, 0n, 0n];
+      for (const doc of arAt("2025-12-31").filter((row) => row.outstanding > 0n)) {
+        const dates = [doc.posting_date];
+        if (basis === "last") {
+          dates.push(...allocations.filter((a) => a.invoice_id === doc.invoice_id && a.status === "Allocated" && a.allocation_date <= "2025-12-31" && receiptById.get(a.receipt_id)?.status === "Posted" && receiptById.get(a.receipt_id)!.receipt_date <= "2025-12-31").map((a) => a.allocation_date));
+          dates.push(...adjustments.filter((a) => a.invoice_id === doc.invoice_id && a.status === "Posted" && a.adjustment_date <= "2025-12-31").map((a) => a.adjustment_date));
+        }
+        const date = dates.sort().at(-1)!;
+        const age = Math.round((Date.parse("2025-12-31") - Date.parse(date)) / 86400000);
+        buckets[age <= 0 ? 0 : age <= 15 ? 1 : age <= 45 ? 2 : age <= 120 ? 3 : 4] += doc.outstanding;
+      }
+      const ageing = await getAgeing("ar", basis, [15, 45, 120]);
+      assert.deepEqual(ageing.buckets.map((row) => cents(row.amount!)), buckets);
+    }
+    const before = await getAgeing("ar", "last", [15, 45, 120]);
+    await fixture(`INSERT INTO finance.ar_receipts (receipt_id,customer_id,receipt_date,receipt_amount_inr,status,source_filename,source_record_number)
+      SELECT 'ARR99999',customer_id,'2026-01-02',100,'Posted','verification',99999 FROM finance.ar_invoices WHERE invoice_id='ARI00003';
+      INSERT INTO finance.ar_receipt_allocations (allocation_id,receipt_id,invoice_id,allocation_date,allocated_amount_inr,status,source_filename,source_record_number)
+      VALUES ('ARA99999','ARR99999','ARI00003','2026-01-02',100,'Allocated','verification',99999)`, async () => {
+      assert.deepEqual(await getAgeing("ar", "last", [15, 45, 120]), before);
+    });
+  });
   const nativeFetch = globalThis.fetch;
+  await check("unsupported comparison periods clarify before provider calls while supported months retain scope", async () => {
+    let calls = 0;
+    globalThis.fetch = async () => { calls++; throw new Error("No provider call expected for unsupported periods"); };
+    try {
+      for (const question of [
+        "Compare receivables in January and March", "Compare receivables from 2025-01 to 2025-03",
+        "Compare receivables in January, February and March", "How did receivables change from January through March?",
+        "How did receivables change between 2025-01-15 and 2025-03-15?", "Compare receivables March and 2025-04",
+        "Show receivables in 2025-13", "Show receivables for Q1", "Show receivables for the last 3 months",
+        "Compare receivables from Jan 15 to Feb 15", "Show receivables on 15th January", "Show receivables on February 28th",
+        "Show receivables last month", "Show receivables previous month", "Show receivables past month",
+      ]) {
+        const reply = await processAgentMessage(question, undefined, { geminiKey: "verification-only", providerPriority: "gemini" });
+        assert.equal(reply.kind, "clarify", question);
+      }
+      assert.equal(calls, 0);
+      const originalQuery = pool.query;
+      const lookupQueries: string[] = [];
+      Object.defineProperty(pool, "query", { writable: true, value: (...args: Parameters<typeof pool.query>) => {
+        lookupQueries.push(String(args[0]));
+        return Reflect.apply(originalQuery, pool, args);
+      } });
+      let shortfallChoice: string | undefined;
+      try {
+        const named = await processAgentMessage("Who pays less than billed for Customer 30 Pvt Ltd between January and March?", undefined, { geminiKey: "verification-only", providerPriority: "gemini" });
+        assert.equal(named.kind, "clarify");
+        if (named.kind === "clarify") {
+          assert.ok(named.choices.length > 0 && named.choices.every((choice) => choice.includes("C030")));
+          shortfallChoice = named.choices.find((choice) => choice.includes("jan 2025"));
+          assert.ok(shortfallChoice);
+        }
+        const ambiguous = await processAgentMessage("Who pays less than billed for Customer 30 Pvt Ltd and Customer 24 Pvt Ltd between January and March?", undefined, { geminiKey: "verification-only", providerPriority: "gemini" });
+        assert.equal(ambiguous.kind, "clarify");
+        if (ambiguous.kind === "clarify") { assert.ok(ambiguous.choices.some((choice) => choice.includes("C030"))); assert.ok(ambiguous.choices.some((choice) => choice.includes("C024"))); }
+        assert.ok(lookupQueries.length > 0 && lookupQueries.every((sql) => sql.includes("FROM finance.customer_master") && !sql.includes("finance.ar_invoices")));
+        assert.equal(calls, 0);
+      } finally { Object.defineProperty(pool, "query", { value: originalQuery, writable: true }); }
+      const scoped = await processAgentMessage(shortfallChoice!, undefined, { providerPriority: "system" });
+      assert.equal(scoped.kind, "answer");
+      if (scoped.kind === "answer") { assert.equal(scoped.context?.tool, "toolShortPayments"); assert.equal(scoped.context?.customerId, "C030"); assert.equal(scoped.context?.month, 1); }
+      for (const [question, month] of [["How did receivables change in March?", 3], ["Compare receivables in November and December", 12], ["Compare receivables 2025-11 and 2025-12", 12], ["Compare receivables in March and February", 3], ["Compare receivables 2025-12 and 2025-11", 12], ["How did receivables change in Jan 2025?", 1]] as const) {
+        const reply = await processAgentMessage(question, undefined, { providerPriority: "system" });
+        assert.equal(reply.kind, "answer", question);
+        if (reply.kind === "answer") { assert.equal(reply.context?.month, month); assert.equal(new URL(reply.example.evidence[0].href, "http://localhost").searchParams.get("month"), String(month)); }
+      }
+      const invoice = await processAgentMessage("Explain ARI00003 dated 2025-03-05", undefined, { providerPriority: "system" });
+      assert.equal(invoice.kind, "answer");
+      if (invoice.kind === "answer") assert.equal(invoice.context?.tool, "toolDocumentEvidence");
+      assert.equal(calls, 0);
+    } finally { globalThis.fetch = nativeFetch; }
+  });
+  await check("fresh client config preserves server model and explicit selection overrides it", async () => {
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+    const originalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+    let saved: string | null = null;
+    Object.defineProperty(globalThis, "window", { configurable: true, value: {} });
+    Object.defineProperty(globalThis, "localStorage", { configurable: true, value: { getItem: () => saved } });
+    try {
+      const fresh = getStoredAiConfig();
+      assert.ok(!fresh.geminiModelConfigured && !fresh.groqModelConfigured);
+      saved = JSON.stringify({ geminiModel: "explicit-gemini", groqModel: "explicit-groq" });
+      const selected = getStoredAiConfig();
+      assert.equal(selected.geminiModelConfigured, true); assert.equal(selected.groqModelConfigured, true);
+      assert.equal(selected.geminiModel, "explicit-gemini"); assert.equal(selected.groqModel, "explicit-groq");
+    } finally {
+      if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow); else Reflect.deleteProperty(globalThis, "window");
+      if (originalStorage) Object.defineProperty(globalThis, "localStorage", originalStorage); else Reflect.deleteProperty(globalThis, "localStorage");
+    }
+    const priorModel = process.env.GROQ_MODEL;
+    const models: unknown[] = [];
+    globalThis.fetch = async (_input, init) => {
+      models.push(JSON.parse(String(init?.body)).model);
+      return Response.json({ choices: [{ message: { tool_calls: [{ function: { name: "toolCollectionAttention", arguments: "{}" } }] } }] });
+    };
+    try {
+      process.env.GROQ_MODEL = "server-selected-model";
+      await processAgentMessage("Who needs collection attention today?", undefined, { groqKey: "verification-only", providerPriority: "groq" });
+      await processAgentMessage("Who needs collection attention today?", undefined, { groqKey: "verification-only", groqModel: "explicit-client-model", providerPriority: "groq" });
+      assert.deepEqual(models, ["server-selected-model", "explicit-client-model"]);
+    } finally { globalThis.fetch = nativeFetch; if (priorModel === undefined) delete process.env.GROQ_MODEL; else process.env.GROQ_MODEL = priorModel; }
+  });
   await check("provider abort and direct text fall through to validated tools", async () => {
     let calls = 0;
     const requests: { body: Record<string, unknown>; signal?: AbortSignal | null }[] = [];
@@ -236,7 +460,9 @@ try {
       process.env.OPENAI_API_KEY = "verification-only";
       const reply = await processAgentMessage("Who needs collection attention today?", undefined, { geminiKey: "verification-only", groqKey: "verification-only" });
       assert.equal(reply.kind, "answer"); assert.equal(calls, 3);
-      for (const request of requests) { assert.equal(request.body.tool_choice, "required"); assert.equal(request.body.max_completion_tokens, 2048); assert.ok(request.signal); }
+      for (const request of requests) { assert.equal(request.body.tool_choice, "required"); assert.equal(request.body.max_completion_tokens, 2048); }
+      assert.equal(requests[0].signal, undefined);
+      assert.ok(requests[1].signal); assert.ok(requests[2].signal);
       if (reply.kind === "answer") { assert.ok(reply.example.facts?.length); assert.notEqual(reply.example.answer, "Invented advisory"); }
     } finally { globalThis.fetch = nativeFetch; delete process.env.OPENAI_API_KEY; }
   });
@@ -315,7 +541,7 @@ try {
   await check("requested month and shortfall follow-up customer are retained", async () => {
     const march = await processAgentMessage("How did receivables change in March?", undefined, { providerPriority: "system" });
     assert.equal(march.kind, "answer");
-    if (march.kind === "answer") { assert.equal(march.context!.month, 3); assert.ok(march.example.answer.includes("Mar 2025")); }
+    if (march.kind === "answer") { assert.equal(march.context!.month, 3); assert.ok(march.example.answer.includes("Mar 2025")); assert.equal(new URL(march.example.evidence[0].href, "http://localhost").searchParams.get("month"), "3"); }
     const short = await processAgentMessage("Who pays less than they are billed?", undefined, { providerPriority: "system" });
     assert.equal(short.kind, "answer");
     if (short.kind === "answer") {

@@ -50,12 +50,12 @@ type AgeingRow = {
   unknownCount: number; rejectedRows: number;
 };
 
-export async function getAgeing(ledger: Ledger, basis: "due" | "date", boundaries: [number, number, number]) {
+export async function getAgeing(ledger: Ledger, basis: "due" | "date" | "posted" | "last", boundaries: [number, number, number]) {
   // Age the outstanding amount, retaining the original document date after partial settlement.
   const result = await getDatabasePool().query<AgeingRow>(`
     WITH ${documentBalancesSql(ledger)},
     aged AS (
-      SELECT outstanding, CASE WHEN $5::text = 'due' THEN due ELSE date END AS basis_date
+      SELECT outstanding, CASE $5::text WHEN 'due' THEN due WHEN 'posted' THEN posted WHEN 'last' THEN last_transaction ELSE date END AS basis_date
       FROM balances
     ), measured AS (
       SELECT outstanding, basis_date, $1::date - basis_date AS elapsed

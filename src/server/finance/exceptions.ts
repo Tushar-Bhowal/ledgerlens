@@ -51,6 +51,12 @@ export async function getExceptions(): Promise<ExceptionsResult> {
         CASE WHEN bool_or(outstanding IS NULL) THEN NULL ELSE sum(greatest(outstanding, 0)) END AS exposure
       FROM docs WHERE nullif(trim(number), '') IS NOT NULL
       GROUP BY ledger, number, party_id, party HAVING count(*) > 1
+    ), cross_party_refs AS (
+      SELECT ledger, number, min(id) AS first_id, min(party_id) AS first_party_id,
+        string_agg(DISTINCT party, ', ' ORDER BY party) AS parties, array_agg(id ORDER BY id) AS evidence,
+        CASE WHEN bool_or(outstanding IS NULL) THEN NULL ELSE sum(greatest(outstanding, 0)) END AS exposure
+      FROM docs WHERE nullif(trim(number), '') IS NOT NULL
+      GROUP BY ledger, number HAVING count(DISTINCT party_id) > 1
     ), items AS (
       SELECT 'LIMIT-' || c.party_id AS id, 'Credit limit'::text AS kind, 'High'::text AS severity,
         c.party, c.party_id, c.document_id, 'Needs review'::text AS status, c.outstanding AS exposure,
@@ -114,6 +120,12 @@ export async function getExceptions(): Promise<ExceptionsResult> {
         'Several active documents for the same party share printed reference ' || number || '.',
         'Compare original vouchers, amounts and delivery records. A repeated reference does not prove duplicate liability or fraud.', evidence
       FROM duplicate_refs
+      UNION ALL
+      SELECT 'CROSS-' || ledger || '-' || first_id, 'Cross-party reference collision', 'Review', parties,
+        first_party_id, first_id, 'Reference collision', exposure,
+        'Documents for different parties share printed reference ' || number || '.',
+        'Compare every linked original voucher and party identity. The amount is combined open exposure, not proven duplicate liability or fraud.', evidence
+      FROM cross_party_refs
       UNION ALL
       SELECT 'NEG-' || id, 'Credit / negative balance', 'Review', party, party_id, id, 'Credit balance', -outstanding,
         'Allocations and signed adjustments exceed the original document amount.',

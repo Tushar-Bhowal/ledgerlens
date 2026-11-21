@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CircleAlert, RotateCcw } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
@@ -55,7 +56,7 @@ function LiveSupplierPaymentReview({ vendorId }: { vendorId?: string }) {
         </div>
       </header>
       <p className="footnote">
-        Eligible obligations appear before blocked items. “Eligible for review” is a scheduling candidate and requires human approval. No automated disbursements are initiated.
+        Eligible obligations appear before blocked items. “Eligible for review” is a scheduling candidate and requires human approval. Related posted payments without approved status require control review; their valid allocations still reduce the balance. This is not a bill-level approval status. No automated disbursements are initiated.
       </p>
 
       {loading && <DataTableSkeleton columns={7} rows={8} />}
@@ -80,7 +81,7 @@ function LiveSupplierPaymentReview({ vendorId }: { vendorId?: string }) {
             { id: "terms", label: "Terms", cell: (row) => `${row.termsDays === null ? "Unavailable" : `${row.termsDays} days`}${row.msme ? " · MSME" : ""}` },
             { id: "status", label: "Review status", cell: (row) => <span className={row.eligible ? "table-status current" : "table-status overdue"}>{row.eligible ? "Eligible for review" : "Blocked by controls"}</span> },
             { id: "outstanding", label: "Outstanding", align: "right", compare: (a, b) => a.outstanding - b.outstanding, cell: (row) => money(row.outstanding) },
-            { id: "controls", label: "Controls", cell: (row) => row.hasHold ? "Payment hold active" : row.hasDispute ? "Commercial dispute" : "Clear" },
+            { id: "controls", label: "Controls", cell: (row) => <>{[row.hasHold ? "Payment hold active" : "", row.hasDispute ? "Commercial dispute" : ""].filter(Boolean).join(" · ")}{row.approvalWarnings.map((payment) => <div key={payment.id}><Link className="text-link" href={`/payables?bill=${row.id}`}>{payment.id}: {payment.status ?? "Approval unknown"}</Link><small className="block">{payment.sourceFilename} · record {payment.sourceRecordNumber}</small></div>)}{!row.hasHold && !row.hasDispute && row.approvalWarnings.length === 0 ? "Clear" : ""}</> },
           ]}
           search={{ label: "Search supplier bills", placeholder: "Search supplier or bill", getText: (row) => `${row.number} ${row.vendorName} ${row.id}` }}
           filters={[

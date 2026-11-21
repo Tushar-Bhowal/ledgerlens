@@ -1,10 +1,10 @@
 # LedgerLens verification report
 
-Executed 21 November 2026 against PostgreSQL 18 in a temporary local `ledgerlens_review` database. `npm run db:setup` applied migrations 001 and 002 and imported the supplied 14 CSVs. Production Neon records and external LLMs were not used by these checks. The temporary PostgreSQL instance was stopped after verification.
+Executed 21 November 2026 against PostgreSQL 18 in a temporary local `ledgerlens_completion` database. `npm run db:setup` applied migrations 001 and 002 and imported the supplied 14 CSVs. Production Neon records were not used. The isolated integration suite used mocked providers; the separate live check below used actual Gemini requests. The temporary PostgreSQL instance was stopped after verification.
 
 ## Actual results
 
-`npm test`: **27 CSV arithmetic assertions passed**. `npm run test:integration`: **28 checks passed, 0 failed**. ESLint completed with zero warnings and TypeScript checking passed. The integration script refuses remote databases and databases not named `ledgerlens_*`. Fixtures are transactionally rolled back; operational limiter records are cleared only in the isolated database.
+`npm test`: **27 CSV arithmetic assertions passed**. `npm run test:integration`: **38 checks passed, 0 failed**. ESLint completed with zero warnings and TypeScript checking passed. The integration script refuses remote databases and databases not named `ledgerlens_*`. Fixtures are transactionally rolled back; operational limiter records are cleared only in the isolated database.
 
 | Verified value | Result |
 |---|---:|
@@ -18,7 +18,7 @@ Executed 21 November 2026 against PostgreSQL 18 in a temporary local `ledgerlens
 | Total overdue AR | ₹3,25,71,982.61 |
 | Disputed overdue AR | ₹92,635.23 |
 | Actionable overdue AR | ₹3,24,79,347.38 |
-| Exception observations | 487; 10 populated categories |
+| Exception observations | 489; 11 populated categories |
 | Actual average daily AR | ₹2,19,11,328.81 |
 | Actual average daily AP | ₹79,20,767.27 |
 | AR invoice-billing days proxy | 132.2 days |
@@ -57,10 +57,27 @@ The scenario check asserts the expected tool, populated facts/tables and source 
 
 ## Limits of this evidence
 
-Provider responses are mocked. Real API credentials, quota, model tool-calling compatibility and wall-clock provider latency are unverified. Browser layout, desktop/mobile, keyboard, microphone, public deployment and screenshot-based presentation demonstrations were not tested. No production latency, universal accuracy, recovery ROI or zero-hallucination guarantee is asserted.
+The isolated integration suite mocks provider responses. A separate code-only live check used configured Gemini credentials against the temporary local database: receivables growth, collections, short payments, vendor priorities and named exception investigation each received HTTP 200 with the expected model-selected tool and a backend answer containing evidence. Customer risk intentionally routes a resolved customer name directly to the backend; that path also returned its expected answer and evidence. These six checks ran in two batches. They establish those specific paths, not all possible wording, providers, sustained quota or production latency. Browser layout, desktop/mobile, keyboard, microphone, public deployment and screenshot-based presentation demonstrations were not tested. No production latency, universal accuracy, recovery ROI or zero-hallucination guarantee is asserted.
 
-The current Assistant times out a provider after eight seconds, which conflicts with the recorded preference to wait for Gemini until it replies or fails. The checks do not establish that all assignment scenario details are complete. Collection replies lack an invoice-level action list. The customer risk profile omits supplied dispute and follow-up rows. Supplier bill priorities do not connect pending approval of related posted payments to their review. A generic duplicate prompt can return an unrelated exception, and the same-party duplicate rule misses the supplied cross-party reference collisions. A non-December receivables answer links to a December period view. These are recorded in `.phurti/plans/audit-findings-assignment-status.md`.
+## Regression coverage added for scenario completion
 
-The new `db:reset` command was reviewed but not executed in this verification. Presentation authoring remains open. `docs/presentation.md` supplies a factual slide brief, and the final PowerPoint still requires actual scenario screenshots.
+Six additional integration checks retain the original 28 checks and verify:
 
-Reviewer commands and source are in README and `scripts/verify-completion.ts`. `npm test` reads the bundled CSVs; it is not a production API or model benchmark. Real-provider and browser checks were explicitly deferred on 21 November 2026.
+- Both supplied cross-party printed-reference collisions, category-scoped duplicate selection and exact-issue follow-up.
+- Invoice-level collection actions, ranked customer order, capped collection/dispute portions and invoice links.
+- Customer receipts, disputes and follow-ups with source locations, chronology warnings, allocation links and exclusion of future events.
+- APP00001 approval review attached to API00007, without changing the recorded settled balance.
+- Posting and last-transaction ageing against an independent CSV bucket oracle; a future receipt/allocation cannot change current ageing.
+- Server model configuration versus explicit browser overrides, with storage simulated in code. March evidence links retain month 3.
+
+Gemini now waits without an application timeout and retains caller cancellation. Other providers keep their eight-second deadline. Collection actions, activity history, supplier approval context, duplicate category handling and month navigation are implemented. TypeScript, lint and the Webpack production build passed after implementation. The regression additions received independent static review.
+
+The new `db:reset` command was reviewed but not executed in this verification. The final eight-slide presentation is included as `docs/LedgerLens_Final.pptx`. Its content, speaker notes and archive structure were reviewed, including the 38 integration-check count. Full rendered-slide layout inspection was not completed. Browser/Playwright checks were explicitly excluded by the user.
+
+## Final cash evidence and period clarification checks
+
+Four further integration checks retain the previous 34 and cover original ARR/APP headers, approval status, references, source record locations and allocation audit; canonical allocated/residual amounts; future/cancelled audit rows and invalid or rejected source coverage; cash API 200/400/404 responses and no-store headers; and unsupported period clarification without provider calls. Single-month and adjacent-month requests retain their actual requested scope. Nonconsecutive named/ISO comparisons, named-day ranges and unsupported relative periods clarify instead of becoming another monthly result. Customer identity is retained in shortfall choices.
+
+The receipt/payment investigation drawer now loads source details instead of stopping at an ID. Raw allocation audit includes inactive and future rows, explicitly separated from cutoff-effective amounts. TypeScript, lint and the Webpack production build passed; no browser or paid-provider checks were used for these final fixes.
+
+Reviewer commands and source are in README and `scripts/verify-completion.ts`. `npm test` reads the bundled CSVs; it is not a production API or model benchmark. Earlier deferral was superseded by approval for the code-only checks above. Browser checks remain excluded.

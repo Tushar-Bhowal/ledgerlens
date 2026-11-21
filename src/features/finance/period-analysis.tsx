@@ -2,6 +2,6 @@
 
 import { LivePeriodAnalysis } from "./live-period-analysis";
 
-export function PeriodAnalysis({ ledger }: { ledger: "ar" | "ap" }) {
-  return <LivePeriodAnalysis ledger={ledger} />;
+export function PeriodAnalysis({ ledger, initialMonth = 12 }: { ledger: "ar" | "ap"; initialMonth?: number }) {
+  return <LivePeriodAnalysis ledger={ledger} initialMonth={initialMonth} />;
 }

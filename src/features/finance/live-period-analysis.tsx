@@ -27,8 +27,8 @@ const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 
 type Result = { state: "loading" } | { state: "error" } | { state: "ready"; data: Period };
 
-export function LivePeriodAnalysis({ ledger }: { ledger: "ar" | "ap" }) {
-  const [month, setMonth] = useState(12);
+export function LivePeriodAnalysis({ ledger, initialMonth = 12 }: { ledger: "ar" | "ap"; initialMonth?: number }) {
+  const [month, setMonth] = useState(initialMonth);
   const [result, setResult] = useState<Result>({ state: "loading" });
   const [attempt, setAttempt] = useState(0);
 

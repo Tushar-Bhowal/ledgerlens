@@ -92,6 +92,7 @@ const AGENT_TOOLS = [
       parameters: {
         type: "object",
         properties: {
+          exceptionCategory: { type: "string", enum: ["duplicates"], description: "Use for duplicate or repeated-reference investigations without an exact issue." },
           issueId: { type: "string", description: "The specific issue ID or reference to investigate, e.g. HLD0001, DSP0001, LIMIT-C028, PO-API00003." },
         },
         required: [],
@@ -204,7 +205,7 @@ async function runTool(context: AgentContext, signal?: AbortSignal): Promise<Pre
       }
       example = await toolCustomerRisk(context.customerId); break;
     case "toolVendorPriorities": example = await toolVendorPriorities(); break;
-    case "toolInvestigateException": example = await toolInvestigateException(context.issueId); break;
+    case "toolInvestigateException": example = await toolInvestigateException(context.issueId, context.exceptionCategory); break;
     case "toolDocumentEvidence":
       if (!context.documentId) return clarify();
       example = await toolDocumentEvidence(context.documentId); break;
@@ -226,8 +227,8 @@ async function runTool(context: AgentContext, signal?: AbortSignal): Promise<Pre
 
 async function executeLlmTurn(provider: LlmProvider, question: string, previous?: AgentContext, signal?: AbortSignal): Promise<AgentContext | "clarify" | null> {
   const timeoutMs = 8000;
-  const timeoutSignal = AbortSignal.timeout(timeoutMs);
-  const turnSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+  const timeoutSignal = provider.name === "Gemini" ? undefined : AbortSignal.timeout(timeoutMs);
+  const turnSignal = signal && timeoutSignal ? AbortSignal.any([signal, timeoutSignal]) : signal ?? timeoutSignal;
   try {
     console.log(`[LedgerLens AI] Contacting ${provider.name} (model: ${provider.model})...`);
     const response = await fetch(provider.endpoint, {
@@ -277,7 +278,7 @@ async function executeLlmTurn(provider: LlmProvider, question: string, previous?
       : call.name === "toolCustomerRisk"
       ? z.object({ customerId: z.string().trim().min(1).max(150) }).strict()
       : call.name === "toolInvestigateException"
-        ? z.object({ issueId: z.string().trim().min(1).max(100).optional() }).strict()
+        ? z.object({ issueId: z.string().trim().min(1).max(100).optional(), exceptionCategory: z.enum(["duplicates"]).optional() }).strict()
         : call.name === "toolDocumentEvidence"
           ? z.object({ documentId: z.string().regex(/^(ARI|API)\d{5}$/i) }).strict()
           : call.name === "toolReceivablesIncrease" ? z.object({ month: z.number().int().min(1).max(12).optional() }).strict() : z.object({}).strict();
@@ -303,10 +304,13 @@ async function executeLlmTurn(provider: LlmProvider, question: string, previous?
       const id = String(validated.data.issueId).toUpperCase();
       if (!question.toUpperCase().includes(id) && previous?.issueId !== id) return "clarify";
     }
+    if (call.name === "toolInvestigateException" && /duplicate|repeated reference|reference collision/.test(normalize(question))) {
+      return agentContextSchema.parse({ tool: call.name, ...validated.data, exceptionCategory: "duplicates" });
+    }
     return agentContextSchema.parse({ tool: call.name, ...validated.data });
   } catch {
     if (signal?.aborted) signal.throwIfAborted();
-    console.warn(`[LedgerLens AI] ${provider.name} routing request failed or timed out (${timeoutMs}ms); trying fallback.`);
+    console.warn(`[LedgerLens AI] ${provider.name} routing request failed${timeoutSignal ? ` or timed out (${timeoutMs}ms)` : ""}; trying fallback.`);
     return null;
   }
 }
@@ -314,9 +318,9 @@ async function executeLlmTurn(provider: LlmProvider, question: string, previous?
 function deterministicSelection(question: string, previous?: AgentContext): AgentContext | undefined {
   const norm = normalize(question);
   const documentId = question.match(/\b(?:ARI|API)\d{5}\b/i)?.[0].toUpperCase();
-  if (documentId && !/exception|investigat|duplicate|unusual/.test(norm)) return { tool: "toolDocumentEvidence", documentId };
-  const issueId = question.match(/\b(?:limit-c\d+|stale-ari\d+|po-api\d+|grn-api\d+|arr\d+|hld\d+|dsp\d+|fup\d+)\b/i)?.[0].toUpperCase();
-  if (/exception|investigat|mismatch|unusual|duplicate/.test(norm) || issueId) return { tool: "toolInvestigateException", issueId: issueId ?? documentId };
+  const issueId = question.match(/\b(?:limit-c\d+|stale-ari\d+|po-api\d+|grn-api\d+|(?:dup|cross)-(?:ar|ap)-(?:ari|api)\d+|dup-(?:pay-app|rec-arr)\d+|arr\d+|hld\d+|dsp\d+|fup\d+)\b/i)?.[0].toUpperCase();
+  if (/exception|investigat|mismatch|unusual|duplicate|repeated reference|reference collision/.test(norm) || issueId) return { tool: "toolInvestigateException", issueId: issueId ?? documentId, exceptionCategory: /duplicate|repeated reference|reference collision/.test(norm) ? "duplicates" : undefined };
+  if (documentId) return { tool: "toolDocumentEvidence", documentId };
   if (/less than.*billed|short.?payment|underpaid|partial payment|pays less|shortfall/.test(norm)) return { tool: "toolShortPayments" };
   if (/vendor|supplier|payable/.test(norm) && /priorit|payment|hold/.test(norm)) return { tool: "toolVendorPriorities" };
   if (/receivable/.test(norm) && /increas|grow|trend|chang|compare/.test(norm) || norm.includes("compare november and december")) return { tool: "toolReceivablesIncrease" };
@@ -360,8 +364,42 @@ export async function processAgentMessage(question: string, previous?: AgentCont
   const selected = explicitSelection ?? deterministicSelection(question, previous);
   const monthLabels = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
   const namedMonths = [...norm.matchAll(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/g)].map((match) => monthLabels.indexOf(match[1].slice(0, 3)) + 1);
-  const isoMonth = norm.match(/\b2025-(0[1-9]|1[0-2])\b/);
-  const month = isoMonth ? Number(isoMonth[1]) : namedMonths.length ? Math.max(...namedMonths) : previous?.month;
+  const isoMonths = [...norm.matchAll(/\b2025-(\d{2})\b/g)].map((match) => Number(match[1]));
+  const distinctMonths = [...new Set([...namedMonths, ...isoMonths])].sort((a, b) => a - b);
+  const conflictingFormats = namedMonths.length > 0 && isoMonths.length > 0
+    && (namedMonths.some((value) => !isoMonths.includes(value)) || isoMonths.some((value) => !namedMonths.includes(value)));
+  const unsupportedRange = distinctMonths.length > 2
+    || distinctMonths.length === 2 && distinctMonths[1] - distinctMonths[0] !== 1;
+  const periodIntent = selected?.tool === "toolReceivablesIncrease" || selected?.tool === "toolShortPayments"
+    || !selected && (/compare|receivable|billing|collection|shortfall|balance|trend|month|quarter/.test(norm)
+      || distinctMonths.length > 0 && /between|from/.test(norm));
+  const monthToken = "(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
+  const dayToken = "(?:0?[1-9]|[12][0-9]|3[01])(?:st|nd|rd|th)?";
+  const namedDay = new RegExp(`\\b(?:${monthToken} ${dayToken}|${dayToken} ${monthToken})\\b`).test(norm);
+  const ambiguousRange = namedDay || /\b(?:last|previous|past) month\b/.test(norm)
+    || /\b2025-\d{2}-\d{2}\b/.test(norm)
+    || /\b(?:q[1-4]|quarter|year[ -]to[ -]date|(?:last|past) (?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve) months)\b/.test(norm)
+    || /\b(?:from|between)\b/.test(norm) && /\b(?:to|through|until|and)\b/.test(norm) && distinctMonths.length > 0 && distinctMonths.length < 2;
+  if (periodIntent && (isoMonths.some((value) => value < 1 || value > 12) || conflictingFormats || unsupportedRange || ambiguousRange)) {
+    const choices = distinctMonths.filter((value) => value >= 1 && value <= 12).slice(-3);
+    const monthsToOffer = choices.length ? choices : [previous?.month ?? 12];
+    let shortfallCustomer: string | undefined;
+    if (selected?.tool === "toolShortPayments") {
+      const customers = await findCustomers(question);
+      if (customers.length > 1) {
+        const value = monthsToOffer[monthsToOffer.length - 1];
+        return { kind: "clarify", choices: customers.slice(0, 5).map((customer) =>
+          `Show customer shortfalls through ${monthLabels[value - 1]} 2025 for ${customer.name} (${customer.id})`) };
+      }
+      shortfallCustomer = customers[0]?.id
+        ?? question.match(/\bc\d{3}\b/i)?.[0].toUpperCase()
+        ?? (!/customer/.test(norm) ? previous?.customerId : undefined);
+    }
+    return { kind: "clarify", choices: monthsToOffer.map((value) => selected?.tool === "toolShortPayments"
+      ? `Show customer shortfalls through ${monthLabels[value - 1]} 2025${shortfallCustomer ? ` for ${shortfallCustomer}` : ""}`
+      : `How did receivables change in ${monthLabels[value - 1]} 2025?`) };
+  }
+  const month = distinctMonths.length ? distinctMonths[distinctMonths.length - 1] : previous?.month;
   if (selected && (selected.tool === "toolReceivablesIncrease" || selected.tool === "toolShortPayments")) selected.month = month;
   if ((!explicitSelection || explicitSelection.tool === "toolCustomerRisk" || explicitSelection.tool === "toolShortPayments") && /customer|\bc\d{3}\b/i.test(question) && (/risk|pay|profile|detail|information|credit|what about/i.test(question) || /\bc\d{3}\b/i.test(question) || previous?.tool === "toolCustomerRisk")) {
     const matches = await findCustomers(question);

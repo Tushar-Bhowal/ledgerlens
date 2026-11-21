@@ -10,10 +10,12 @@ import { AnalyticsSummary } from "@/features/finance/analytics-summary";
 import { CustomerAnalysis } from "@/features/receivables/customer-analysis";
 import { snapshot } from "@/lib/demo-data";
 
-export default async function ReceivablesPage({ searchParams }: { searchParams: Promise<{ invoice?: string | string[]; customer?: string | string[]; view?: string | string[] }> }) {
-  const { invoice, customer, view } = await searchParams;
+export default async function ReceivablesPage({ searchParams }: { searchParams: Promise<{ invoice?: string | string[]; customer?: string | string[]; view?: string | string[]; month?: string | string[] }> }) {
+  const { invoice, customer, view, month } = await searchParams;
   const invoiceId = typeof invoice === "string" ? invoice : undefined;
   const customerId = typeof customer === "string" ? customer : undefined;
+
+  const periodMonth = typeof month === "string" && /^(?:[1-9]|1[0-2])$/.test(month) ? Number(month) : 12;
 
   const allowedViews = ["invoices", "customers", "ageing", "period", "measures"];
   const selectedView = typeof view === "string" && allowedViews.includes(view) ? view : "invoices";
@@ -25,11 +27,11 @@ export default async function ReceivablesPage({ searchParams }: { searchParams: 
         <StatCard label="Invoices in source" value={600} liveKey="invoiceCount" caption="Source invoice records" icon={FileSearch} />
         <StatCard label="Unallocated receipts" value={snapshot.unallocatedReceipts} liveKey="unallocatedReceipts" format="rupees" caption="Kept separate from invoices" icon={WalletCards} attention />
       </div>
-      <FinanceDashboard key={`${invoiceId ?? customerId ?? "ar"}-${selectedView}`} label="Receivables views" views={[
+      <FinanceDashboard key={`${invoiceId ?? customerId ?? "ar"}-${selectedView}-${periodMonth}`} label="Receivables views" views={[
         { id: "invoices", label: "Invoices", content: <InvoiceExplorer invoiceId={invoiceId} /> },
         { id: "customers", label: "Customers & risk", content: <CustomerAnalysis customerId={customerId} /> },
         { id: "ageing", label: "Ageing", content: <AgeingAnalysis ledger="ar" /> },
-        { id: "period", label: "Period analysis", content: <PeriodAnalysis ledger="ar" /> },
+        { id: "period", label: "Period analysis", content: <PeriodAnalysis ledger="ar" initialMonth={periodMonth} /> },
         { id: "measures", label: "Measures", content: <AnalyticsSummary ledger="ar" /> },
       ]} initialView={invoiceId ? "invoices" : customerId ? "customers" : selectedView} />
     </>

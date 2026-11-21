@@ -63,7 +63,7 @@ export async function getCustomerPriorities(customerId?: string) {
           (b.oldest_days > 90 OR COALESCE(c.credit_limit_inr > 0 AND b.outstanding > c.credit_limit_inr, false) OR f.customer_id IS NOT NULL) DESC,
           (b.overdue - b.disputed) DESC, b.oldest_days DESC, p.days DESC NULLS LAST, c.customer_id
       ) AS rank,
-      c.customer_id AS id, c.customer_name AS name, c.parent_group AS "group", c.region,
+      c.customer_id AS id, c.customer_name AS name, c.parent_group AS "group", c.region, c.credit_period_days AS "creditPeriodDays", c.payment_terms AS "paymentTerms",
       CASE WHEN b.incomplete THEN NULL ELSE coalesce(b.outstanding, 0)::text END AS outstanding,
       CASE WHEN b.incomplete THEN NULL ELSE coalesce(b.overdue, 0)::text END AS overdue,
       CASE WHEN b.incomplete THEN NULL ELSE coalesce(b.disputed, 0)::text END AS disputed,
