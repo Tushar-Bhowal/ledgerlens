@@ -40,7 +40,7 @@ export function LivePeriodAnalysis({ ledger }: { ledger: "ar" | "ap" }) {
         if (!response.ok) throw new Error("Period analysis unavailable");
         return response.json() as Promise<Period>;
       })
-      .then((data) => setResult({ state: "ready", data }))
+      .then((data) => { if (!controller.signal.aborted) setResult({ state: "ready", data }); })
       .catch(() => { if (!controller.signal.aborted) setResult({ state: "error" }); });
     return () => controller.abort();
   }, [ledger, month, attempt]);

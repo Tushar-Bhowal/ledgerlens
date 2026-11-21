@@ -1,207 +1,106 @@
 import "server-only";
 import { getDatabasePool } from "@/server/db";
 import { documentBalancesSql, reportingDate, type Ledger } from "./documents";
+import { snapshotRowsSql } from "./snapshots";
 
-export type MeasurePattern = {
-  label: string;
-  amount: string;
-};
-
-export type PartyConcentration = {
-  id: string;
-  party: string;
-  amount: string;
-  share: number | null;
-};
-
-export type GroupConcentration = {
-  name: string;
-  amount: string;
-  share: number | null;
-  members: { id: string; name: string }[];
-};
-
+export type MeasurePattern = { label: string; amount: string | null };
+export type PartyConcentration = { id: string; party: string; amount: string | null; share: number | null };
+export type GroupConcentration = { name: string; amount: string | null; share: number | null; members: { id: string; name: string }[] };
 export type MeasuresResult = {
   asOf: string;
   ledger: Ledger;
   overduePercent: number | null;
   proxyDays: number | null;
+  standardDays: number | null;
   elapsedDays: number | null;
-  totalPositive: string;
+  totalPositive: string | null;
+  averageDailyBalance: string | null;
+  denominatorLabel: string;
+  proxyLabel: string;
   patterns: MeasurePattern[];
   parties: PartyConcentration[];
   groups: GroupConcentration[];
   rejectedRows: number;
+  complete: boolean;
 };
 
-function formatAmount(val: number): string {
-  return (Math.round(val * 100) / 100).toFixed(2);
-}
-
 export async function getMeasures(ledger: Ledger): Promise<MeasuresResult> {
-  const pool = getDatabasePool();
   const ar = ledger === "ar";
-  const idCol = ar ? "invoice_id" : "bill_id";
-  const partyCol = ar ? "customer_id" : "vendor_id";
-  const headerTable = ar ? "ar_invoices" : "ap_invoices";
-  const masterTable = ar ? "customer_master" : "vendor_master";
-  const groupCol = ar ? "parent_group" : "vendor_group";
-  const dateCol = ar ? "invoice_date" : "bill_date";
-  const amountCol = ar ? "invoice_amount_inr" : "bill_amount_inr";
-  const allocTable = ar ? "ar_receipt_allocations" : "ap_payment_allocations";
-  const cashTable = ar ? "ar_receipts" : "ap_payments";
-  const cashIdCol = ar ? "receipt_id" : "payment_id";
-  const cashDateCol = ar ? "receipt_date" : "payment_date";
-
-  // Check rejected import records
-  const rejResult = await pool.query<{ rejected: number }>(
-    "SELECT count(*)::integer AS rejected FROM finance.import_issues WHERE issue_code = 'rejected'"
-  );
-  const rejectedRows = rejResult.rows[0]?.rejected ?? 0;
-
-  // 1. Get balances using the shared documentBalancesSql
-  const balancesQuery = await pool.query<{
-    id: string;
-    party_id: string;
-    party: string;
-    group_name: string | null;
-    date: string;
-    due: string;
-    face: string;
-    outstanding: string | null;
-    status: string;
-  }>(`
-    WITH ${documentBalancesSql(ledger)}
-    SELECT b.id, b.party_id, b.party, m.${groupCol} AS group_name,
-      b.date::text AS date, b.due::text AS due, b.face::text AS face,
-      b.outstanding::text AS outstanding, b.status
-    FROM balances b
-    JOIN finance.${masterTable} m ON m.${partyCol} = b.party_id
+  const id = ar ? "invoice_id" : "bill_id";
+  const partyId = ar ? "customer_id" : "vendor_id";
+  const master = ar ? "customer_master" : "vendor_master";
+  const group = ar ? "parent_group" : "vendor_group";
+  const allocations = ar ? "ar_receipt_allocations" : "ap_payment_allocations";
+  const cash = ar ? "ar_receipts" : "ap_payments";
+  const cashId = ar ? "receipt_id" : "payment_id";
+  const cashDate = ar ? "receipt_date" : "payment_date";
+  const result = await getDatabasePool().query<Omit<MeasuresResult, "asOf" | "ledger" | "denominatorLabel" | "proxyLabel" | "standardDays">>(`
+    WITH ${documentBalancesSql(ledger)}, cutoffs AS (
+      SELECT day::date AS cutoff FROM generate_series(date_trunc('year', $1::date), $1::date, interval '1 day') day
+    ), daily_balances AS MATERIALIZED (
+      -- Average actual daily closing balances, including genuine zero-balance days.
+      SELECT cutoffs.cutoff, t.balance, t.incomplete FROM cutoffs CROSS JOIN LATERAL (
+        WITH historical AS (${snapshotRowsSql(ledger)})
+        SELECT coalesce(sum(outstanding), 0) AS balance, coalesce(bool_or(outstanding IS NULL), false) AS incomplete FROM historical
+      ) t
+    ), coverage AS (
+      SELECT (SELECT count(*)::integer FROM finance.import_issues WHERE issue_code = 'rejected') AS rejected,
+        NOT EXISTS (SELECT 1 FROM balances WHERE outstanding IS NULL OR date IS NULL OR (outstanding > 0 AND due IS NULL))
+        AND NOT EXISTS (SELECT 1 FROM daily_balances WHERE incomplete) AS valid
+    ), readiness AS (SELECT rejected, valid AND rejected = 0 AS complete FROM coverage), totals AS (
+      SELECT coalesce(sum(greatest(outstanding, 0)), 0) AS positive,
+        coalesce(sum(outstanding) FILTER (WHERE status = 'overdue'), 0) AS overdue,
+        coalesce(sum(face) FILTER (WHERE date BETWEEN date_trunc('year', $1::date)::date AND $1::date), 0) AS billing
+      FROM balances
+    ), party_values AS (
+      SELECT party_id AS id, party, sum(outstanding) AS amount FROM balances WHERE outstanding > 0 GROUP BY party_id, party
+    ), group_values AS (
+      SELECT coalesce(m.${group}, 'Group unavailable') AS name, sum(b.outstanding) AS amount,
+        json_agg(DISTINCT jsonb_build_object('id', b.party_id, 'name', b.party)) AS members
+      FROM balances b JOIN finance.${master} m ON m.${partyId} = b.party_id
+      WHERE b.outstanding > 0 GROUP BY coalesce(m.${group}, 'Group unavailable')
+    ), timing AS (
+      -- Allocation totals validate the whole split cash voucher before any portion enters timing metrics.
+      SELECT a.allocated_amount_inr AS amount, a.allocation_date - b.date AS doc_days,
+        a.allocation_date - b.due AS due_days
+      FROM balances b JOIN allocation_totals t ON t.document_id = b.id AND NOT t.invalid
+      JOIN finance.${allocations} a ON a.${id} = b.id
+      JOIN finance.${cash} c ON c.${cashId} = a.${cashId} AND c.${partyId} = b.party_id
+      WHERE b.outstanding IS NOT NULL AND b.date IS NOT NULL AND b.due IS NOT NULL
+        AND a.status = 'Allocated' AND c.status = 'Posted' AND a.allocated_amount_inr > 0
+        AND a.allocation_date BETWEEN b.date AND $1::date AND c.${cashDate} <= $1::date
+    ), timing_totals AS (
+      SELECT sum(amount * doc_days) / nullif(sum(amount), 0) AS elapsed,
+        coalesce(sum(amount) FILTER (WHERE due_days < 0), 0) AS early,
+        coalesce(sum(amount) FILTER (WHERE due_days = 0), 0) AS on_time,
+        coalesce(sum(amount) FILTER (WHERE due_days BETWEEN 1 AND 30), 0) AS late_30,
+        coalesce(sum(amount) FILTER (WHERE due_days > 30), 0) AS late_more FROM timing
+    ), average_balance AS (SELECT avg(balance) AS amount, count(*) AS days FROM daily_balances)
+    SELECT r.rejected AS "rejectedRows", r.complete,
+      CASE WHEN r.complete THEN round(t.overdue / nullif(t.positive, 0) * 100, 1)::float8 END AS "overduePercent",
+      CASE WHEN r.complete THEN t.positive::text END AS "totalPositive",
+      CASE WHEN r.complete THEN round(a.amount, 2)::text END AS "averageDailyBalance",
+      CASE WHEN r.complete AND a.amount >= 0 AND t.billing > 0 THEN round(a.amount / t.billing * a.days, 1)::float8 END AS "proxyDays",
+      CASE WHEN r.complete THEN round(tt.elapsed, 1)::float8 END AS "elapsedDays",
+      json_build_array(
+        json_build_object('label', 'Early (before due date)', 'amount', CASE WHEN r.complete THEN tt.early::text END),
+        json_build_object('label', 'On time (on due date)', 'amount', CASE WHEN r.complete THEN tt.on_time::text END),
+        json_build_object('label', '1–30 days late', 'amount', CASE WHEN r.complete THEN tt.late_30::text END),
+        json_build_object('label', '31+ days late', 'amount', CASE WHEN r.complete THEN tt.late_more::text END)
+      ) AS patterns,
+      CASE WHEN r.complete THEN (SELECT coalesce(json_agg(json_build_object('id', p.id, 'party', p.party, 'amount', p.amount::text,
+        'share', (p.amount / nullif(t.positive, 0))::float8) ORDER BY p.amount DESC, p.id), '[]'::json)
+        FROM (SELECT * FROM party_values ORDER BY amount DESC, id LIMIT 5) p) ELSE '[]'::json END AS parties,
+      CASE WHEN r.complete THEN (SELECT coalesce(json_agg(json_build_object('name', g.name, 'amount', g.amount::text,
+        'share', (g.amount / nullif(t.positive, 0))::float8, 'members', g.members) ORDER BY g.amount DESC, g.name), '[]'::json)
+        FROM group_values g) ELSE '[]'::json END AS groups
+    FROM readiness r CROSS JOIN totals t CROSS JOIN timing_totals tt CROSS JOIN average_balance a
   `, [reportingDate]);
-
-  let totalPositiveCents = 0;
-  let overdueCents = 0;
-  const partyMap = new Map<string, { id: string; party: string; amountCents: number }>();
-  const groupMap = new Map<string, { name: string; amountCents: number; members: Map<string, string> }>();
-
-  for (const row of balancesQuery.rows) {
-    const out = row.outstanding ? Math.round(Number(row.outstanding) * 100) : 0;
-    if (out > 0) {
-      totalPositiveCents += out;
-      if (row.status === "overdue") {
-        overdueCents += out;
-      }
-      // Party concentration
-      const pEntry = partyMap.get(row.party_id) ?? { id: row.party_id, party: row.party, amountCents: 0 };
-      pEntry.amountCents += out;
-      partyMap.set(row.party_id, pEntry);
-
-      // Group concentration
-      const gName = row.group_name || "Group unavailable";
-      const gEntry = groupMap.get(gName) ?? { name: gName, amountCents: 0, members: new Map() };
-      gEntry.amountCents += out;
-      gEntry.members.set(row.party_id, row.party);
-      groupMap.set(gName, gEntry);
-    }
-  }
-
-  const overduePercent = totalPositiveCents > 0
-    ? Math.round((overdueCents / totalPositiveCents) * 1000) / 10
-    : null;
-
-  const parties: PartyConcentration[] = [...partyMap.values()]
-    .sort((a, b) => b.amountCents - a.amountCents)
-    .slice(0, 5)
-    .map((p) => ({
-      id: p.id,
-      party: p.party,
-      amount: formatAmount(p.amountCents / 100),
-      share: totalPositiveCents > 0 ? (p.amountCents / totalPositiveCents) : null,
-    }));
-
-  const groups: GroupConcentration[] = [...groupMap.values()]
-    .sort((a, b) => b.amountCents - a.amountCents || a.name.localeCompare(b.name))
-    .map((g) => ({
-      name: g.name,
-      amount: formatAmount(g.amountCents / 100),
-      share: totalPositiveCents > 0 ? (g.amountCents / totalPositiveCents) : null,
-      members: [...g.members.entries()].map(([id, name]) => ({ id, name })),
-    }));
-
-  // 2. Settlement Timing & Elapsed Days (amount-weighted)
-  const allocTimingQuery = await pool.query<{
-    allocated_amount: number;
-    days_from_doc: number;
-    days_from_due: number;
-  }>(`
-    SELECT a.allocated_amount_inr::numeric AS allocated_amount,
-      (a.allocation_date - d.${dateCol})::integer AS days_from_doc,
-      (a.allocation_date - d.due_date)::integer AS days_from_due
-    FROM finance.${allocTable} a
-    JOIN finance.${headerTable} d ON d.${idCol} = a.${idCol}
-    JOIN finance.${cashTable} c ON c.${cashIdCol} = a.${cashIdCol}
-    WHERE a.status = 'Allocated' AND d.status = 'Posted' AND c.status = 'Posted'
-      AND a.allocation_date <= $1::date AND c.${cashDateCol} <= $1::date
-      AND a.allocated_amount_inr > 0
-  `, [reportingDate]);
-
-  let totalAllocCents = 0;
-  let weightedDocDaysCents = 0;
-  let earlyCents = 0;
-  let onTimeCents = 0;
-  let late1to30Cents = 0;
-  let late31PlusCents = 0;
-
-  for (const row of allocTimingQuery.rows) {
-    const amtCents = Math.round(Number(row.allocated_amount) * 100);
-    totalAllocCents += amtCents;
-    weightedDocDaysCents += amtCents * row.days_from_doc;
-
-    if (row.days_from_due < 0) {
-      earlyCents += amtCents;
-    } else if (row.days_from_due === 0) {
-      onTimeCents += amtCents;
-    } else if (row.days_from_due <= 30) {
-      late1to30Cents += amtCents;
-    } else {
-      late31PlusCents += amtCents;
-    }
-  }
-
-  const elapsedDays = totalAllocCents > 0
-    ? Math.round(weightedDocDaysCents / totalAllocCents)
-    : null;
-
-  const patterns: MeasurePattern[] = [
-    { label: "Early (before due date)", amount: formatAmount(earlyCents / 100) },
-    { label: "On time (on due date)", amount: formatAmount(onTimeCents / 100) },
-    { label: "1–30 days late", amount: formatAmount(late1to30Cents / 100) },
-    { label: "31+ days late", amount: formatAmount(late31PlusCents / 100) },
-  ];
-
-  // 3. DSO / DPO proxy: (mean daily balance / total 2025 net billing) * 365
-  const netBillingQuery = await pool.query<{ total_billing: number }>(`
-    SELECT COALESCE(SUM(${amountCol}), 0)::numeric AS total_billing
-    FROM finance.${headerTable}
-    WHERE status = 'Posted' AND EXTRACT(YEAR FROM ${dateCol}) = 2025
-  `);
-  const totalBilling = Number(netBillingQuery.rows[0]?.total_billing ?? 0);
-
-  // Mean balance over the year
-  const totalPos = totalPositiveCents / 100;
-  const meanDailyBalance = totalPos * 0.55; // Realistic proxy of average 2025 balance
-  const proxyDays = totalBilling > 0 ? Math.round((meanDailyBalance / totalBilling) * 365) : null;
-
   return {
-    asOf: reportingDate,
-    ledger,
-    overduePercent,
-    proxyDays,
-    elapsedDays,
-    totalPositive: formatAmount(totalPos),
-    patterns,
-    parties,
-    groups,
-    rejectedRows,
+    ...result.rows[0], asOf: reportingDate, ledger, standardDays: null,
+    proxyLabel: ar ? "Invoice-billing DSO proxy" : "Purchase-billing AP days proxy",
+    denominatorLabel: ar
+      ? "Actual average daily net AR / posted 2025 invoice-face billing by original invoice date × elapsed calendar days. Net credit sales are not separately supplied."
+      : "Actual average daily net AP / posted 2025 bill-face purchases by original bill date × elapsed calendar days. Standard DPO is unavailable because COGS is not supplied.",
   };
 }

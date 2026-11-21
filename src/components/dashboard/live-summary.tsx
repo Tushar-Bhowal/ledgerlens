@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
-export type SummaryKey = "receivables" | "payables" | "netTradeBalance" | "unallocatedReceipts" | "invoiceCount" | "billCount" | "pendingApprovals";
+export type SummaryKey = "receivables" | "payables" | "netTradeBalance" | "unallocatedReceipts" | "invoiceCount" | "billCount" | "pendingApprovals" | "unallocatedReceiptCount";
 type Summary = Record<SummaryKey, string | number | null> & { rejectedRows: number };
 type SummaryState = { status: "loading" } | { status: "error" } | { status: "ready"; data: Summary };
 
@@ -19,7 +19,7 @@ export function LiveSummaryProvider({ active, children }: { active: boolean; chi
         if (!response.ok) throw new Error("Summary unavailable");
         return response.json() as Promise<Summary>;
       })
-      .then((data) => setState({ status: "ready", data }))
+      .then((data) => { if (!controller.signal.aborted) setState({ status: "ready", data }); })
       .catch(() => { if (!controller.signal.aborted) setState({ status: "error" }); });
     return () => controller.abort();
   }, [active]);

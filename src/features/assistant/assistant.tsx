@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, ChartNoAxesCombined, ClipboardList, FileText, List, Mic, ReceiptText, RotateCcw, Square, WalletCards } from "lucide-react";
+import { ArrowUp, ChartNoAxesCombined, ClipboardList, Cpu, FileText, List, Mic, ReceiptText, RotateCcw, Square, WalletCards } from "lucide-react";
 import { Popover } from "radix-ui";
 import { AssistantReply } from "./assistant-reply";
 import { examples, followUp } from "./examples";
 import { usePreviewConversation, type PreviewOutcome, type PreviewTurn } from "./preview-conversation";
 import { useVoiceDictation } from "./use-voice-dictation";
+import { AISettingsDialog } from "@/components/dashboard/ai-settings-dialog";
 
 const draftLimit = 500;
 const suggestions = [
@@ -25,8 +26,9 @@ export function Assistant({ exampleId }: { exampleId?: string }) {
 
 function AssistantConversation({ exampleId }: { exampleId?: string }) {
   const [draft, setDraft] = useState(() => examples.find((example) => example.id === exampleId)?.question ?? "");
-  const { turns, pending, begin, stop, clear } = usePreviewConversation();
+  const { turns, pending, begin, stop, clear, historyReady, historyAvailable } = usePreviewConversation();
   const [examplesOpen, setExamplesOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const promptChosen = useRef(false);
   const scrollArea = useRef<HTMLDivElement>(null);
   const latestResponse = useRef<HTMLDivElement>(null);
@@ -165,23 +167,33 @@ function AssistantConversation({ exampleId }: { exampleId?: string }) {
               }
             }} />
           <div className="composer-tools">
-            <Popover.Root open={examplesOpen} onOpenChange={setExamplesOpen}>
-              <Popover.Trigger className="assistant-tool" type="button"><List size={17} aria-hidden="true" /> Examples</Popover.Trigger>
-              <Popover.Portal>
-                <Popover.Content align="start" side="top" sideOffset={8} className="assistant-example-menu" aria-label="Example questions" onCloseAutoFocus={(event) => {
-                  if (!promptChosen.current) return;
-                  event.preventDefault();
-                  promptChosen.current = false;
-                  input.current?.focus();
-                }}>
-                  {examples.map(({ id, question, topic }) => (
-                    <button key={id} type="button" onClick={() => choosePrompt(question)}>
-                      <small>{topic}</small>{question}
-                    </button>
-                  ))}
-                </Popover.Content>
-              </Popover.Portal>
-            </Popover.Root>
+            <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+              <Popover.Root open={examplesOpen} onOpenChange={setExamplesOpen}>
+                <Popover.Trigger className="assistant-tool" type="button"><List size={17} aria-hidden="true" /> Examples</Popover.Trigger>
+                <Popover.Portal>
+                  <Popover.Content align="start" side="top" sideOffset={8} className="assistant-example-menu" aria-label="Example questions" onCloseAutoFocus={(event) => {
+                    if (!promptChosen.current) return;
+                    event.preventDefault();
+                    promptChosen.current = false;
+                    input.current?.focus();
+                  }}>
+                    {examples.map(({ id, question, topic }) => (
+                      <button key={id} type="button" onClick={() => choosePrompt(question)}>
+                        <small>{topic}</small>{question}
+                      </button>
+                    ))}
+                  </Popover.Content>
+                </Popover.Portal>
+              </Popover.Root>
+              <button
+                type="button"
+                className="assistant-tool"
+                onClick={() => setSettingsOpen(true)}
+                title="Configure Gemini & Groq API credentials"
+              >
+                <Cpu size={15} aria-hidden="true" /> AI Config
+              </button>
+            </div>
             <div className="composer-actions">
               {voice.phase === "listening" && (
                 <span className="dictation-wave" data-speaking={voice.speaking || undefined} aria-hidden="true">
@@ -198,7 +210,7 @@ function AssistantConversation({ exampleId }: { exampleId?: string }) {
                   <Square size={16} aria-hidden="true" />
                 </button>
               ) : (
-                <button className="assistant-send" type="submit" disabled={!draft.trim() || voiceBusy || draftTooLong} aria-label="Send question">
+                <button className="assistant-send" type="submit" disabled={!historyReady || !draft.trim() || voiceBusy || draftTooLong} aria-label="Send question">
                   <ArrowUp size={19} aria-hidden="true" />
                 </button>
               )}
@@ -206,9 +218,12 @@ function AssistantConversation({ exampleId }: { exampleId?: string }) {
           </div>
         </form>
         {draftTooLong && <p className="voice-status" id="assistant-draft-limit" role="status">Shorten the draft to {draftLimit} characters before sending.</p>}
+        {!historyAvailable && <p className="voice-status" role="status">History could not be saved in this browser. It may be lost when you leave or refresh.</p>}
         <p className="voice-status" role="status">{voice.message}</p>
         <span className="sr-only" role="status">{voice.phase === "listening" ? "Recording" : voice.phase === "finishing" ? "Finishing dictation" : voice.phase === "starting" ? "Waiting for microphone" : ""}</span>
       </div>
+
+      <AISettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </section>
   );
 }

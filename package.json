@@ -9,6 +9,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "node --import tsx scripts/verify-scenarios.ts",
+    "test:integration": "node --conditions=react-server --import tsx scripts/verify-completion.ts",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "migrate": "tsx scripts/migrate.ts",

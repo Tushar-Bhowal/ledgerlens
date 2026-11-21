@@ -74,8 +74,8 @@ function Answer({ example, evidenceOnly }: { example: PreviewExample; evidenceOn
 
 const interruptions = {
   stopped: { title: "Response stopped", detail: "Try again when you’re ready." },
-  "service-error": { title: "Service unavailable", detail: "Simulated provider error. Retry to load the sample answer." },
-  "rate-limit": { title: "Request limit reached", detail: "Simulated rate limit. Retry to continue the preview." },
+  "service-error": { title: "Service unavailable", detail: "The assistant could not retrieve the live result. Please retry." },
+  "rate-limit": { title: "Request limit reached", detail: "Please wait a minute before sending another question." },
 };
 
 export function AssistantReply({ reply, onChoose, onRetry, retryDisabled }: {
@@ -91,6 +91,14 @@ export function AssistantReply({ reply, onChoose, onRetry, retryDisabled }: {
         <span>{loadingSteps[reply.step]}…</span>
       </div>
     );
+  }
+
+  if (reply.kind === "message") {
+    return <div className="reply-complete"><p className="reply-lead">{reply.text}</p></div>;
+  }
+
+  if (reply.kind === "unsupported") {
+    return <div className="reply-complete"><p>{reply.message ?? "The starter data does not include inventory, COGS, bank statements or GL/control balances. I cannot calculate full CCC or perform bank/GL reconciliation from this snapshot."}</p></div>;
   }
 
   if (reply.kind === "answer") {

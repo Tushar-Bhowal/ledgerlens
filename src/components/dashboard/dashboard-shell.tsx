@@ -11,16 +11,21 @@ import { LiveHistoryProvider } from "./live-history";
 
 export function DashboardShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const [openPath, setOpenPath] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [openPathname, setOpenPathname] = useState<string | null>(null);
 
-  if (openPath !== null && openPath !== pathname) setOpenPath(null);
-
-  const open = openPath === pathname;
-  const close = () => setOpenPath(null);
+  const isOpen = open && openPathname === pathname;
+  const close = () => setOpen(false);
 
   return (
     <>
-      <Dialog.Root open={open} onOpenChange={(next) => setOpenPath(next ? pathname : null)}>
+      <Dialog.Root
+        open={isOpen}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (next) setOpenPathname(pathname);
+        }}
+      >
         <Topbar
           pathname={pathname}
           menu={
@@ -31,7 +36,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             </Dialog.Trigger>
           }
         />
-        <Sidebar open={open} pathname={pathname} onNavigate={close} />
+        <Sidebar open={isOpen} pathname={pathname} onNavigate={close} />
       </Dialog.Root>
       <main className="dashboard-main">
         <LiveSummaryProvider active={true}>

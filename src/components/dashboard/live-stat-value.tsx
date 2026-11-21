@@ -26,7 +26,15 @@ export function LiveStatValue({ stat, format }: { stat?: SummaryKey; format?: "c
   if (summary.status === "loading") return <><span className="sr-only" role="status">Loading financial summary</span><Skeleton className="skeleton-value" /></>;
   if (summary.status === "error") return <span title="Could not load the financial summary">Unavailable</span>;
   const value = summary.data[stat];
-  if (value === null) return <span title="Source data needs review">Unavailable</span>;
+  if (value === null || value === undefined) return <span title="Source data needs review">Unavailable</span>;
   if (typeof value === "number") return new Intl.NumberFormat("en-IN").format(value);
   return (format === "crore" ? formatCrore(value) : formatRupees(value)) ?? "Unavailable";
+}
+
+
+export function LiveReceiptCaption() {
+  const summary = useLiveSummary();
+  if (summary.status === "loading") return <Skeleton className="skeleton-label" />;
+  if (summary.status !== "ready" || summary.data.unallocatedReceiptCount == null) return <>Receipt count unavailable</>;
+  return <>{summary.data.unallocatedReceiptCount} receipts to reconcile</>;
 }

@@ -1,25 +1,54 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { readChatHistory, writeChatHistory } from "./chat-history";
+import type { AgentContext } from "@/lib/assistant-contract";
 import type { PreviewExample } from "./examples";
+import { getStoredAiConfig } from "@/lib/ai-client-config";
 
 export type PreviewOutcome = "normal" | "service-error" | "rate-limit";
 
 export type PreviewReply =
   | { kind: "loading"; step: number }
-  | { kind: "answer"; example: PreviewExample; evidenceOnly: boolean }
+  | { kind: "message"; text: string }
+  | { kind: "answer"; example: PreviewExample; evidenceOnly: boolean; context?: AgentContext }
   | { kind: "clarify"; choices: readonly string[] }
-  | { kind: "unsupported" | "stopped" | "service-error" | "rate-limit" };
+  | { kind: "unsupported"; message?: string }
+  | { kind: "stopped" | "service-error" | "rate-limit" };
 
 export type PreviewTurn = { id: number; question: string; reply: PreviewReply };
 
-export const loadingSteps = ["Executing financial tools", "Querying PostgreSQL system of record", "Synthesizing evidence-backed findings"];
+export const loadingSteps = ["Preparing your question", "Selecting the financial analysis", "Retrieving live facts and evidence"];
 
 export function usePreviewConversation() {
   const [turns, setTurns] = useState<PreviewTurn[]>([]);
   const [pending, setPending] = useState(false);
+  const [historyReady, setHistoryReady] = useState(false);
+  const [historyAvailable, setHistoryAvailable] = useState(true);
   const queued = useRef<{ id: number; timers: ReturnType<typeof setTimeout>[]; controller?: AbortController } | null>(null);
   const nextId = useRef(0);
+
+  useEffect(() => {
+    let mounted = true;
+    // Restore after hydration so server HTML and the browser's initial render agree.
+    queueMicrotask(() => {
+      if (!mounted) return;
+      const saved = readChatHistory();
+      nextId.current = saved.turns.reduce((next, turn) => Math.max(next, turn.id + 1), 0);
+      setTurns(saved.turns);
+      setHistoryAvailable(saved.available);
+      setHistoryReady(true);
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!historyReady) return;
+    let mounted = true;
+    const saved = writeChatHistory(turns);
+    queueMicrotask(() => { if (mounted) setHistoryAvailable(saved); });
+    return () => { mounted = false; };
+  }, [turns, historyReady]);
 
   useEffect(() => () => {
     queued.current?.timers.forEach((timer) => clearTimeout(timer));
@@ -32,11 +61,11 @@ export function usePreviewConversation() {
   }
 
   function begin(question: string, outcome: PreviewOutcome = "normal", retryId?: number) {
-    if (queued.current) return false;
+    if (!historyReady || queued.current) return false;
     const id = retryId ?? nextId.current++;
     const before = retryId === undefined ? turns : turns.slice(0, turns.findIndex((turn) => turn.id === retryId));
     const previous = before.findLast((turn) => turn.reply.kind === "answer")?.reply;
-    const lastExample = previous?.kind === "answer" ? previous.example : undefined;
+    const context = previous?.kind === "answer" ? previous.context : undefined;
 
     const loading: PreviewReply = { kind: "loading", step: 0 };
     if (retryId === undefined) {
@@ -77,25 +106,36 @@ export function usePreviewConversation() {
       }, 1200)
     );
 
+    const aiConfig = typeof window !== "undefined" ? getStoredAiConfig() : null;
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (aiConfig?.geminiApiKey) headers["x-gemini-key"] = aiConfig.geminiApiKey;
+    if (aiConfig?.geminiModel) headers["x-gemini-model"] = aiConfig.geminiModel;
+    if (aiConfig?.groqApiKey) headers["x-groq-key"] = aiConfig.groqApiKey;
+    if (aiConfig?.groqModel) headers["x-groq-model"] = aiConfig.groqModel;
+    if (aiConfig?.providerPriority) headers["x-ai-provider"] = aiConfig.providerPriority;
+
     fetch("/api/assistant/chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, lastExampleId: lastExample?.id }),
+      headers,
+      body: JSON.stringify({ question, context }),
       signal: controller.signal,
     })
       .then((res) => {
+        if (res.status === 429) return { reply: { kind: "rate-limit" } as PreviewReply };
         if (!res.ok) throw new Error("Assistant chat failed");
         return res.json() as Promise<{ reply: PreviewReply }>;
       })
       .then((data) => {
         if (queued.current === request) {
+          request.timers.forEach((timer) => clearTimeout(timer));
           queued.current = null;
           setPending(false);
           update(id, data.reply);
         }
       })
-      .catch((err) => {
-        if (queued.current === request && err.name !== "AbortError") {
+      .catch(() => {
+        if (queued.current === request) {
+          request.timers.forEach((timer) => clearTimeout(timer));
           queued.current = null;
           setPending(false);
           update(id, { kind: "service-error" });
@@ -120,8 +160,9 @@ export function usePreviewConversation() {
     queued.current?.controller?.abort();
     queued.current = null;
     setPending(false);
+    setHistoryAvailable(writeChatHistory([]));
     setTurns([]);
   }
 
-  return { turns, pending, begin, stop, clear };
+  return { turns, pending, begin, stop, clear, historyReady, historyAvailable };
 }

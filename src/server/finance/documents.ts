@@ -6,7 +6,7 @@ export type Ledger = "ar" | "ap";
 export const reportingDate = "2025-12-31";
 
 // Allocations and adjustments are aggregated independently to avoid multiplying rows.
-export function documentBalancesSql(ledger: Ledger) {
+export function documentBalancesSql(ledger: Ledger, includeAudit = false) {
   // These table and column names come only from the validated ledger choice, never from user input.
   const ar = ledger === "ar";
   const id = ar ? "invoice_id" : "bill_id";
@@ -56,7 +56,8 @@ export function documentBalancesSql(ledger: Ledger) {
       -- A credit reduces the balance; a debit increases it. Keep this sum separate from allocations.
       SELECT a.${id} AS document_id,
         SUM(CASE a.adjustment_type WHEN 'Credit Note' THEN -a.amount_inr WHEN 'Debit Note' THEN a.amount_inr END) AS adjustment,
-        BOOL_OR(a.amount_inr IS NULL OR a.amount_inr < 0 OR a.adjustment_type NOT IN ('Credit Note', 'Debit Note') OR a.adjustment_type IS NULL OR a.${party} <> d.${party}) AS invalid
+        BOOL_OR(a.amount_inr IS NULL OR a.amount_inr < 0 OR a.adjustment_type NOT IN ('Credit Note', 'Debit Note') OR a.adjustment_type IS NULL OR a.${party} <> d.${party}
+          OR a.adjustment_date < d.posting_date) AS invalid
       FROM finance.${adjustment} a JOIN finance.${header} d ON d.${id} = a.${id}
       WHERE a.status = 'Posted' AND a.adjustment_date <= $1::date
       GROUP BY a.${id}
@@ -64,20 +65,20 @@ export function documentBalancesSql(ledger: Ledger) {
       -- A missing date or unknown status prevents us from deciding whether an event applies.
       SELECT a.${id} AS document_id
       FROM finance.${allocation} a JOIN finance.${cash} c ON c.${cashId} = a.${cashId}
-      WHERE a.status IS NULL OR c.status IS NULL
+      WHERE (a.allocation_date <= $1::date OR a.allocation_date IS NULL) AND (a.status IS NULL OR c.status IS NULL
         OR a.status NOT IN ('Allocated', 'Cancelled', 'Canceled', 'Reversed', 'Voided')
         OR c.status NOT IN ('Posted', 'Cancelled', 'Canceled', 'Reversed', 'Voided')
         OR (a.status = 'Allocated' AND c.status = 'Posted'
-          AND (a.allocation_date IS NULL OR c.${cashDate} IS NULL))
+          AND (a.allocation_date IS NULL OR c.${cashDate} IS NULL)))
       UNION
       SELECT a.${id} FROM finance.${adjustment} a
-      WHERE a.status IS NULL OR a.status NOT IN ('Posted', 'Cancelled', 'Canceled', 'Reversed', 'Voided')
-        OR (a.status = 'Posted' AND a.adjustment_date IS NULL)
+      WHERE (a.adjustment_date <= $1::date OR a.adjustment_date IS NULL) AND (a.status IS NULL OR a.status NOT IN ('Posted', 'Cancelled', 'Canceled', 'Reversed', 'Voided')
+        OR (a.status = 'Posted' AND a.adjustment_date IS NULL))
     ), amounts AS (
       -- Outstanding = original amount - allocated cash + signed adjustments.
       -- NULL means the supporting information is incomplete or inconsistent.
       SELECT d.${id} AS id, d.${number} AS number, d.${party} AS party_id, p.${partyName} AS party,
-        d.${originalDate} AS date, d.posting_date AS posted, d.due_date AS due,
+        d.${originalDate} AS date, d.posting_date AS posted, d.due_date AS due, d.status AS source_status,
         ${ar ? "NULL::text" : "p.criticality"} AS criticality,
         ${ar ? "NULL::integer" : "p.payment_terms_days"} AS terms_days,
         ${ar ? "NULL::boolean" : "p.msme_flag"} AS msme,
@@ -87,15 +88,16 @@ export function documentBalancesSql(ledger: Ledger) {
         CASE WHEN COALESCE(a.invalid, false) OR u.document_id IS NOT NULL THEN NULL ELSE COALESCE(a.paid, 0) END AS paid,
         CASE WHEN COALESCE(j.invalid, false) OR u.document_id IS NOT NULL THEN NULL ELSE COALESCE(j.adjustment, 0) END AS adjustment,
         d.source_filename, d.source_record_number,
-        CASE WHEN d.${amount} IS NULL OR d.posting_date IS NULL OR d.status IS DISTINCT FROM 'Posted' OR d.currency IS DISTINCT FROM 'INR'
+        CASE WHEN d.${amount} IS NULL OR d.posting_date IS NULL OR d.posting_date > $1::date OR d.status IS DISTINCT FROM 'Posted' OR d.currency IS DISTINCT FROM 'INR'
+            OR d.posting_date < d.${originalDate} OR d.due_date < d.${originalDate}
             OR COALESCE(a.invalid, false) OR COALESCE(j.invalid, false) OR u.document_id IS NOT NULL
           THEN NULL ELSE d.${amount} - COALESCE(a.paid, 0) + COALESCE(j.adjustment, 0) END AS outstanding
       FROM finance.${header} d JOIN finance.${master} p ON p.${party} = d.${party}
       LEFT JOIN allocation_totals a ON a.document_id = d.${id}
       LEFT JOIN adjustment_totals j ON j.document_id = d.${id}
       LEFT JOIN uncertain_events u ON u.document_id = d.${id}
-      WHERE (d.status IS NULL OR d.status NOT IN ('Cancelled', 'Canceled', 'Reversed', 'Voided'))
-        AND (d.posting_date <= $1::date OR d.posting_date IS NULL)
+      ${includeAudit ? '' : `WHERE (d.status IS NULL OR d.status NOT IN ('Cancelled', 'Canceled', 'Reversed', 'Voided'))
+        AND (d.posting_date <= $1::date OR d.posting_date IS NULL)`}
     ), balances AS (
       SELECT *, CASE WHEN outstanding IS NULL THEN 'unknown' WHEN outstanding < 0 THEN 'credit'
         WHEN outstanding = 0 THEN 'settled' WHEN due IS NULL THEN 'unknown'
@@ -110,14 +112,14 @@ export type DocumentRow = {
   face: string | null; paid: string | null; adjustment: string | null; outstanding: string | null;
   criticality: string | null; termsDays: number | null; msme: boolean | null;
   purchaseOrder: string | null; grn: string | null;
-  status: string; sourceFilename: string; sourceRecordNumber: number;
+  status: string; sourceStatus: string | null; sourceFilename: string; sourceRecordNumber: number;
 };
 
 const selectedColumns = `id, number, party_id AS "partyId", party,
   date::text AS date, posted::text AS posted, due::text AS due,
   face::text AS face, paid::text AS paid, adjustment::text AS adjustment,
   criticality, terms_days AS "termsDays", msme, purchase_order AS "purchaseOrder", grn,
-  outstanding::text AS outstanding, status,
+  outstanding::text AS outstanding, status, source_status AS "sourceStatus",
   source_filename AS "sourceFilename", source_record_number AS "sourceRecordNumber"`;
 
 export async function listDocuments(ledger: Ledger, page: number, pageSize: number, search: string, status: string, partyId: string, sort: "number" | "due" | "outstanding", direction: "asc" | "desc") {
@@ -153,7 +155,7 @@ export async function getDocumentEvidence(ledger: Ledger, id: string) {
   const adjustment = ar ? "ar_adjustments" : "ap_adjustments";
   const pool = getDatabasePool();
   const result = await pool.query<DocumentRow & { allocations: unknown[]; adjustments: unknown[] }>(`
-    WITH ${documentBalancesSql(ledger)}
+    WITH ${documentBalancesSql(ledger, true)}
     SELECT ${selectedColumns},
       -- Include source IDs and CSV locations so a reviewer can trace each displayed allocation.
       COALESCE((SELECT json_agg(json_build_object(

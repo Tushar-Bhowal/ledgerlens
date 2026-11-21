@@ -5,6 +5,13 @@ import { CircleAlert, RotateCcw, X } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { DataTableSkeleton } from "@/components/ui/loading-skeletons";
 import { StateMessage } from "@/components/ui/state-message";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { LiveDocuments } from "./live-documents";
 
 type Customer = {
@@ -44,12 +51,13 @@ export function LiveCustomers({ customerId }: { customerId?: string }) {
   useEffect(() => {
     // This endpoint returns ranked customers calculated from the same balances as the invoice table.
     const controller = new AbortController();
-    fetch("/api/finance/customers", { signal: controller.signal, cache: "no-store" })
+    fetch(customerId ? `/api/finance/customers?customerId=${encodeURIComponent(customerId)}` : "/api/finance/customers", { signal: controller.signal, cache: "no-store" })
       .then((response) => {
         if (!response.ok) throw new Error("Could not load customers");
         return response.json() as Promise<{ rows: Customer[]; rejectedRows: number }>;
       })
       .then((result) => {
+        if (controller.signal.aborted) return;
         setRows(result.rows);
         setRejectedRows(result.rejectedRows);
         setSelected(result.rows.find((row) => row.id === customerId) ?? null);
@@ -96,80 +104,97 @@ export function LiveCustomers({ customerId }: { customerId?: string }) {
           ]}
           pageSize={8} />
       )}
-      {selected && (
-        <div className="customer-review-card" role="region" aria-label={`${selected.name} profile review`}>
-          <div className="customer-review-header">
-            <div>
-              <span className="mini-label">CUSTOMER PROFILE REVIEW</span>
-              <h3 className="customer-review-title">{selected.name}</h3>
-              <p className="customer-review-subtitle">
-                ID: <strong>{selected.id}</strong>
-                {selected.group ? ` · Group: ${selected.group}` : ""}
-                {selected.region ? ` · Region: ${selected.region}` : ""}
-              </p>
-            </div>
-            <button
-              type="button"
-              className="table-tool-button close-profile-button"
-              onClick={() => setSelected(null)}
-              aria-label="Close customer review"
-            >
-              <X size={15} aria-hidden="true" />
-              Close profile
-            </button>
-          </div>
+      {customerId && rows !== null && !error && !selected && <p className="finance-validation" role="status">The requested customer was not found in the reporting scope. Choose a customer from the live table.</p>}
+      <Dialog open={Boolean(selected)} onOpenChange={(open) => { if (!open) setSelected(null); }}>
+        <DialogContent
+          className="sm:max-w-7xl w-[min(calc(100vw-2rem),80rem)] max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden border border-border bg-card shadow-2xl rounded-2xl"
+          showCloseButton={true}
+        >
+          {selected ? (
+            <>
+              <div className="flex items-start justify-between gap-4 px-6 py-5 border-b border-border bg-card/60 backdrop-blur-xs pr-12">
+                <div>
+                  <span className="inline-block px-2.5 py-0.5 mb-1.5 text-[10px] font-semibold tracking-wider uppercase rounded-md bg-primary/10 text-primary border border-primary/20">
+                    Customer Profile Review
+                  </span>
+                  <DialogTitle className="text-2xl font-bold tracking-tight text-foreground">
+                    {selected.name}
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-muted-foreground mt-1">
+                    Customer ID: <strong className="text-foreground font-mono">{selected.id}</strong>
+                    {selected.group ? ` · Group: ${selected.group}` : ""}
+                    {selected.region ? ` · Region: ${selected.region}` : ""}
+                    {selected.priority ? (
+                      <>
+                        {" · Priority: "}
+                        <span className={selected.priority === "High" ? "text-amber-500 font-medium" : "font-medium"}>
+                          {selected.priority}
+                        </span>
+                      </>
+                    ) : ""}
+                  </DialogDescription>
+                </div>
+              </div>
 
-          <div className="customer-metrics-grid">
-            <div className="customer-metric-card">
-              <span className="metric-label">Positive outstanding</span>
-              <span className="metric-value">{amount(selected.outstanding)}</span>
-            </div>
-            <div className="customer-metric-card">
-              <span className="metric-label">Overdue balance</span>
-              <span className="metric-value overdue">{amount(selected.overdue)}</span>
-            </div>
-            <div className="customer-metric-card">
-              <span className="metric-label">Collection portion</span>
-              <span className="metric-value">{amount(selected.actionable)}</span>
-            </div>
-            <div className="customer-metric-card">
-              <span className="metric-label">Disputed portion</span>
-              <span className="metric-value">{amount(selected.disputed)}</span>
-            </div>
-            <div className="customer-metric-card">
-              <span className="metric-label">Credit limit</span>
-              <span className="metric-value">{amount(selected.limit)}</span>
-            </div>
-            <div className="customer-metric-card">
-              <span className="metric-label">Settlement days</span>
-              <span className="metric-value">
-                {selected.paymentDays === null ? "Unavailable" : `${Number(selected.paymentDays).toFixed(1)} days`}
-              </span>
-            </div>
-          </div>
+              <div className="overflow-y-auto px-6 py-5 flex flex-col gap-5 min-h-0">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <div className="flex flex-col gap-1 p-3 bg-background border border-border rounded-xl shadow-2xs">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Positive outstanding</span>
+                    <span className="text-base font-semibold tabular-nums text-foreground">{amount(selected.outstanding)}</span>
+                  </div>
+                  <div className="flex flex-col gap-1 p-3 bg-background border border-border rounded-xl shadow-2xs">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Overdue balance</span>
+                    <span className="text-base font-semibold tabular-nums text-amber-500 dark:text-amber-400">{amount(selected.overdue)}</span>
+                  </div>
+                  <div className="flex flex-col gap-1 p-3 bg-background border border-border rounded-xl shadow-2xs">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Collection portion</span>
+                    <span className="text-base font-semibold tabular-nums text-foreground">{amount(selected.actionable)}</span>
+                  </div>
+                  <div className="flex flex-col gap-1 p-3 bg-background border border-border rounded-xl shadow-2xs">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Disputed portion</span>
+                    <span className="text-base font-semibold tabular-nums text-foreground">{amount(selected.disputed)}</span>
+                  </div>
+                  <div className="flex flex-col gap-1 p-3 bg-background border border-border rounded-xl shadow-2xs">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Credit limit</span>
+                    <span className="text-base font-semibold tabular-nums text-foreground">{amount(selected.limit)}</span>
+                  </div>
+                  <div className="flex flex-col gap-1 p-3 bg-background border border-border rounded-xl shadow-2xs">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Settlement days</span>
+                    <span className="text-base font-semibold tabular-nums text-foreground">
+                      {selected.paymentDays === null ? "Unavailable" : `${Number(selected.paymentDays).toFixed(1)} days`}
+                    </span>
+                  </div>
+                </div>
 
-          <div className="customer-review-notice">
-            <p className="footnote">
-              Historical credit limits are unavailable. The table below lists all live customer invoices, cash allocations, and signed adjustments for <strong>{selected.name}</strong> as of 31 Dec 2025.
-            </p>
-          </div>
+                <div className="p-3.5 rounded-xl bg-accent/40 border border-border text-xs leading-relaxed text-muted-foreground">
+                  Historical credit limits are unavailable. The table below lists all live customer invoices, cash allocations, and signed adjustments for <strong className="text-foreground">{selected.name}</strong> as of 31 Dec 2025.
+                </div>
 
-          <div className="customer-invoices-container">
-            <LiveDocuments key={selected.id} ledger="ar" partyId={selected.id} nested />
-          </div>
+                <div className="min-w-0">
+                  <LiveDocuments key={selected.id} ledger="ar" partyId={selected.id} nested />
+                </div>
+              </div>
 
-          <div className="customer-review-footer">
-            <button
-              type="button"
-              className="table-tool-button close-profile-button"
-              onClick={() => setSelected(null)}
-            >
-              <X size={15} aria-hidden="true" />
-              Close profile
-            </button>
-          </div>
-        </div>
-      )}
+              <div className="flex items-center justify-end px-6 py-3 border-t border-border bg-card/60 backdrop-blur-xs">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelected(null)}
+                  className="cursor-pointer"
+                >
+                  <X className="size-4 mr-1.5" aria-hidden="true" />
+                  Close profile
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="sr-only">
+              <DialogTitle>Customer Profile Review</DialogTitle>
+              <DialogDescription>Customer details</DialogDescription>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

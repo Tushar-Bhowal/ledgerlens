@@ -7,13 +7,14 @@ import { DataTableSkeleton } from "@/components/ui/loading-skeletons";
 import { StateMessage } from "@/components/ui/state-message";
 import { StatCard } from "@/components/ui/stat-card";
 import { days, percent } from "./preview-data";
-import { money } from "@/lib/demo-data";
+import { formatLiveAmount } from "./live-analysis-format";
 import type { MeasuresResult } from "@/server/finance/measures";
 
 export function AnalyticsSummary({ ledger }: { ledger: "ar" | "ap" }) {
   const [liveData, setLiveData] = useState<MeasuresResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -23,6 +24,7 @@ export function AnalyticsSummary({ ledger }: { ledger: "ar" | "ap" }) {
         return res.json() as Promise<MeasuresResult>;
       })
       .then((data) => {
+        if (controller.signal.aborted) return;
         setLiveData(data);
         setLoading(false);
       })
@@ -33,24 +35,16 @@ export function AnalyticsSummary({ ledger }: { ledger: "ar" | "ap" }) {
         }
       });
     return () => controller.abort();
-  }, [ledger]);
+  }, [ledger, attempt]);
 
   const metrics = {
-    positive: liveData ? Number(liveData.totalPositive) : 0,
     overduePercent: liveData?.overduePercent ?? null,
     proxyDays: liveData?.proxyDays ?? null,
     elapsedDays: liveData?.elapsedDays ?? null,
-    patterns: liveData?.patterns.map((p) => ({ label: p.label, amount: Number(p.amount) })) ?? [],
+    patterns: liveData?.patterns ?? [],
   };
-
-  const total = metrics.positive;
-  const parties = liveData?.parties.map((p) => ({ id: p.id, party: p.party, amount: Number(p.amount) })) ?? [];
-  const groups = liveData?.groups.map((g) => ({
-    name: g.name,
-    amount: Number(g.amount),
-    share: g.share,
-    members: g.members,
-  })) ?? [];
+  const parties = liveData?.parties ?? [];
+  const groups = liveData?.groups ?? [];
 
   return (
     <section className="panel finance-panel">
@@ -59,15 +53,16 @@ export function AnalyticsSummary({ ledger }: { ledger: "ar" | "ap" }) {
       {loading && <DataTableSkeleton columns={3} rows={4} />}
       {error && !loading && (
         <StateMessage icon={CircleAlert} title="Measures unavailable" description="Failed to calculate measures from database.">
-          <button type="button" className="table-tool-button" onClick={() => setLoading(true)}><RotateCcw size={16} aria-hidden="true" /> Try again</button>
+          <button type="button" className="table-tool-button" onClick={() => { setError(false); setLoading(true); setAttempt((value) => value + 1); }}><RotateCcw size={16} aria-hidden="true" /> Try again</button>
         </StateMessage>
       )}
 
       {!loading && !error && (
         <>
+          {liveData?.complete === false && <p className="finance-validation" role="status">Some source data is incomplete. Affected measures and concentration amounts remain unavailable.</p>}
           <div className="stat-strip">
-            <StatCard label="Overdue share" value={metrics.overduePercent ?? "Unavailable"} format="percent" caption="Positive past-due / positive open" />
-            <StatCard label={ledger === "ar" ? "DSO estimate" : "Purchase-based DPO proxy"} value={days(metrics.proxyDays)} caption="2025 supplied ledger estimate" />
+            <StatCard label="Overdue share" value={metrics.overduePercent === null ? "Unavailable" : metrics.overduePercent / 100} format="percent" caption="Positive past-due / positive open" />
+            <StatCard label={liveData?.proxyLabel ?? (ledger === "ar" ? "DSO estimate" : "Purchase-based DPO proxy")} value={days(metrics.proxyDays)} caption={liveData?.denominatorLabel ?? "2025 supplied ledger estimate"} />
             <StatCard label="Actual settlement days" value={days(metrics.elapsedDays)} caption="Amount-weighted elapsed days" />
           </div>
           <p className="footnote">2025 measures use mean daily balance ÷ net document-date billing × 365. Settlement days weight each allocated portion from the original document date. The AP proxy uses purchases because COGS is absent.</p>
@@ -79,9 +74,9 @@ export function AnalyticsSummary({ ledger }: { ledger: "ar" | "ap" }) {
                   <li key={item.id}>
                     <div>
                       {ledger === "ar" ? <Link className="text-link" href={`/receivables?customer=${item.id}`}>{item.party}</Link> : item.party}
-                      <strong>{percent(total > 0 ? item.amount / total : 0)}</strong>
+                      <strong>{percent(item.share)}</strong>
                     </div>
-                    <span>{money(item.amount)}</span>
+                    <span>{formatLiveAmount(item.amount)}</span>
                   </li>
                 ))}
               </ol>
@@ -92,7 +87,7 @@ export function AnalyticsSummary({ ledger }: { ledger: "ar" | "ap" }) {
                 {metrics.patterns.map((item) => (
                   <div key={item.label}>
                     <dt>{item.label}</dt>
-                    <dd>{money(item.amount)}</dd>
+                    <dd>{formatLiveAmount(item.amount)}</dd>
                   </div>
                 ))}
               </dl>
@@ -104,7 +99,7 @@ export function AnalyticsSummary({ ledger }: { ledger: "ar" | "ap" }) {
           <div className="group-concentration-list">
             {groups.map((group) => (
               <details key={group.name}>
-                <summary><span>{group.name}</span><strong>{money(group.amount)} · {percent(group.share ?? 0)}</strong></summary>
+                <summary><span>{group.name}</span><strong>{formatLiveAmount(group.amount)} · {percent(group.share)}</strong></summary>
                 <ul>
                   {group.members.map((member) => (
                     <li key={member.id}>

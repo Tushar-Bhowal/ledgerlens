@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPeriodAnalysis } from "@/server/finance/analysis";
-import type { Ledger } from "@/server/finance/documents";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  const ledger = request.nextUrl.searchParams.get("ledger") ?? "ar";
+  const rawMonth = request.nextUrl.searchParams.get("month") ?? "12";
+  const month = Number(rawMonth);
+  if ((ledger !== "ar" && ledger !== "ap") || !/^\d{1,2}$/.test(rawMonth) || !Number.isInteger(month) || month < 1 || month > 12) {
+    return NextResponse.json({ error: "Ledger must be ar or ap, and month must be an integer from 1 to 12." }, { status: 400 });
+  }
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const ledgerParam = searchParams.get("ledger");
-    const ledger: Ledger = ledgerParam === "ap" ? "ap" : "ar";
-    const monthParam = searchParams.get("month");
-    const month = monthParam ? Number(monthParam) : 12;
-
-    const data = await getPeriodAnalysis(ledger, month);
-    return NextResponse.json(data);
-  } catch (error) {
-    console.error("Period analysis error:", error);
-    return NextResponse.json({ error: "Failed to load period analysis" }, { status: 500 });
+    return NextResponse.json(await getPeriodAnalysis(ledger, month), { headers: { "Cache-Control": "no-store" } });
+  } catch {
+    console.error("Period analysis query failed");
+    return NextResponse.json({ error: "Failed to load period analysis" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
 }

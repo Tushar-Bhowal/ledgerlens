@@ -8,7 +8,7 @@ type StatCardProps = {
   label: string;
   value: ReactNode;
   format?: CountFormat;
-  caption?: string;
+  caption?: ReactNode;
   icon?: LucideIcon;
   attention?: boolean;
   chart?: ReactNode;

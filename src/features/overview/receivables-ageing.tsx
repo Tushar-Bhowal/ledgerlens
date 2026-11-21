@@ -36,7 +36,7 @@ export function ReceivablesAgeing() {
         if (!response.ok) throw new Error("Ageing unavailable");
         return response.json() as Promise<Ageing>;
       })
-      .then((result) => { setData(result); setStatus("ready"); })
+      .then((result) => { if (!controller.signal.aborted) { setData(result); setStatus("ready"); } })
       .catch(() => { if (!controller.signal.aborted) setStatus("error"); });
     return () => controller.abort();
   }, [attempt]);

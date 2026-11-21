@@ -1368,3 +1368,4 @@ select option { color: var(--foreground); background: var(--popover); }
 .reply-table th, .reply-table td { padding: 7px 10px; font-size: 12px; }
 .reply-table td:first-child { min-width: 150px; }
 .reply-table .text-link { font-size: 12px; }
+

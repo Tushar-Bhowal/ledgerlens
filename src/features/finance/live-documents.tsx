@@ -23,6 +23,7 @@ type DocumentRow = {
   adjustment: string | null;
   outstanding: string | null;
   status: string;
+  sourceStatus: string | null;
   criticality: string | null;
   termsDays: number | null;
   msme: boolean | null;
@@ -107,7 +108,7 @@ function LiveEvidence({ ledger, id, onClose }: { ledger: Ledger; id: string; onC
     const controller = new AbortController();
     // Fetch evidence only when a document is opened. The ID is the source ID, not its printed number.
     getJson<Evidence>(`/api/finance/documents/${encodeURIComponent(id)}?ledger=${ledger}`, controller.signal)
-      .then((data) => setResult({ state: "ready", data }))
+      .then((data) => { if (!controller.signal.aborted) setResult({ state: "ready", data }); })
       .catch((error: unknown) => {
         if (!controller.signal.aborted) setResult({ state: "error", message: error instanceof Error ? error.message : "Could not load evidence." });
       });
@@ -142,6 +143,7 @@ function LiveEvidence({ ledger, id, onClose }: { ledger: Ledger; id: string; onC
       {result.state === "ready" && (
         <>
           <dl className="detail-list">
+            <div><dt>Source status</dt><dd>{result.data.document.sourceStatus ?? "Unavailable"}</dd></div>
             <div><dt>Original amount</dt><dd>{formatAmount(result.data.document.face)}</dd></div>
             <div><dt>Allocated cash</dt><dd>{formatAmount(result.data.document.paid)}</dd></div>
             <div><dt>Signed adjustments</dt><dd>{formatAmount(result.data.document.adjustment)}</dd></div>
@@ -211,6 +213,7 @@ export function LiveDocuments({
     if (partyId) params.set("partyId", partyId);
     getJson<DocumentPage>(`/api/finance/documents?${params}`, controller.signal)
       .then((data) => {
+        if (controller.signal.aborted) return;
         const lastPage = Math.max(1, Math.ceil(data.total / pageSize));
         if (page > lastPage) {
           setPage(lastPage);

@@ -10,10 +10,19 @@ import { EvidenceDrawer } from "@/components/dashboard/evidence-drawer";
 import { money } from "@/lib/demo-data";
 import type { ExceptionItem } from "@/server/finance/exceptions";
 
+function sourceHref(id: string) {
+  if (/^ARI\d{5}$/.test(id)) return `/receivables?invoice=${encodeURIComponent(id)}`;
+  if (/^API\d{5}$/.test(id)) return `/payables?bill=${encodeURIComponent(id)}`;
+  if (/^C\d{3}$/.test(id)) return `/receivables?customer=${encodeURIComponent(id)}`;
+  if (/^V\d{3}$/.test(id)) return `/payables?vendor=${encodeURIComponent(id)}`;
+  return null;
+}
+
 export function ExceptionExplorer({ issueId }: { issueId?: string }) {
   const [liveData, setLiveData] = useState<{ rows: ExceptionItem[]; total: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [selected, setSelected] = useState<ExceptionItem | null>(null);
 
   useEffect(() => {
@@ -24,6 +33,7 @@ export function ExceptionExplorer({ issueId }: { issueId?: string }) {
         return res.json() as Promise<{ rows: ExceptionItem[]; total: number }>;
       })
       .then((data) => {
+        if (controller.signal.aborted) return;
         setLiveData(data);
         setLoading(false);
         if (issueId) {
@@ -38,7 +48,7 @@ export function ExceptionExplorer({ issueId }: { issueId?: string }) {
         }
       });
     return () => controller.abort();
-  }, [issueId]);
+  }, [issueId, attempt]);
 
   const issues: ExceptionItem[] = liveData?.rows ?? [];
 
@@ -57,7 +67,7 @@ export function ExceptionExplorer({ issueId }: { issueId?: string }) {
         {loading && <DataTableSkeleton columns={6} rows={8} />}
         {error && !loading && (
           <StateMessage icon={CircleAlert} title="Exceptions unavailable" description="The investigation register could not be loaded from the database.">
-            <button type="button" className="table-tool-button" onClick={() => setLoading(true)}>
+            <button type="button" className="table-tool-button" onClick={() => { setError(false); setLoading(true); setAttempt((value) => value + 1); }}>
               <RotateCcw size={16} aria-hidden="true" /> Try again
             </button>
           </StateMessage>
@@ -107,11 +117,12 @@ export function ExceptionExplorer({ issueId }: { issueId?: string }) {
           <h3>Recommended investigation</h3>
           <p className="footnote">{selected.action}</p>
           <h3>Source references</h3>
-          {selected.evidence.map((id) => (
-            <Link className="allocation evidence-text-link" key={id} href={`/${id.startsWith("ARI") ? "receivables?invoice" : "payables?bill"}=${id}`}>
-              {id}
-            </Link>
-          ))}
+          {selected.evidence.map((id) => {
+            const href = sourceHref(id);
+            return href
+              ? <Link className="allocation evidence-text-link" key={id} href={href}>{id}</Link>
+              : <p className="allocation" key={id}>{id} · Source record reference</p>;
+          })}
           {selected.kind === "Unallocated receipt" && <p className="footnote">Source ar_receipts.csv. Cash remains separate until a valid allocation is recorded.</p>}
           <p className="footnote">A source flag justifies review. It does not establish fraud or authorise payments, write-offs or ledger changes.</p>
         </EvidenceDrawer>

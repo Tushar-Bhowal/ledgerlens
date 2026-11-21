@@ -14,6 +14,7 @@ export function Opportunities() {
   const [liveData, setLiveData] = useState<OpportunitiesResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -23,6 +24,7 @@ export function Opportunities() {
         return res.json() as Promise<OpportunitiesResult>;
       })
       .then((data) => {
+        if (controller.signal.aborted) return;
         setLiveData(data);
         setLoading(false);
       })
@@ -33,7 +35,7 @@ export function Opportunities() {
         }
       });
     return () => controller.abort();
-  }, []);
+  }, [attempt]);
 
   const totals = liveData?.totals ?? { actionable: 0, disputed: 0, overdue: 0 };
   const rows: OverdueOpportunity[] = liveData?.opportunities ?? [];
@@ -52,7 +54,7 @@ export function Opportunities() {
       {loading && <DataTableSkeleton columns={3} rows={4} />}
       {error && !loading && (
         <StateMessage icon={CircleAlert} title="Opportunities unavailable" description="Failed to calculate opportunities from database.">
-          <button type="button" className="table-tool-button" onClick={() => setLoading(true)}><RotateCcw size={16} aria-hidden="true" /> Try again</button>
+          <button type="button" className="table-tool-button" onClick={() => { setError(false); setLoading(true); setAttempt((value) => value + 1); }}><RotateCcw size={16} aria-hidden="true" /> Try again</button>
         </StateMessage>
       )}
 

@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { ArrowDownLeft, ArrowRight, ArrowUpRight, BadgeIndianRupee, ChevronRight, MessageSquareText, ShieldAlert, WalletCards } from "lucide-react";
+import { ArrowDownLeft, ArrowRight, ArrowUpRight, BadgeIndianRupee, MessageSquareText, WalletCards } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
 import { BalanceSparkline } from "@/components/dashboard/balance-sparkline";
 import { InvoiceExplorer } from "@/features/receivables/invoice-explorer";
-import { exceptions, money, snapshot } from "@/lib/demo-data";
+import { snapshot } from "@/lib/demo-data";
 import { BalanceTrend } from "./balance-trend";
+import { LiveReceiptCaption } from "@/components/dashboard/live-stat-value";
+import { LiveReviewItems } from "./live-review-items";
 import { ReceivablesAgeing } from "./receivables-ageing";
 
 export function Overview() {
@@ -19,7 +21,7 @@ export function Overview() {
             <StatCard label="Open receivables" value={snapshot.receivablesCrore} liveKey="receivables" format="crore" icon={ArrowDownLeft} chart={<BalanceSparkline balance="receivables" />} />
             <StatCard label="Open payables" value={snapshot.payablesCrore} liveKey="payables" format="crore" icon={ArrowUpRight} chart={<BalanceSparkline balance="payables" />} />
             <StatCard label="Net trade balance" value={snapshot.netTradeBalanceCrore} liveKey="netTradeBalance" format="crore" caption="Receivables less payables" icon={WalletCards} chart={<BalanceSparkline balance="net" />} />
-            <StatCard label="Unallocated receipts" value={snapshot.unallocatedReceipts} liveKey="unallocatedReceipts" format="rupees" caption={`${snapshot.unallocatedReceiptCount} receipts to reconcile`} icon={BadgeIndianRupee} attention />
+            <StatCard label="Unallocated receipts" value={snapshot.unallocatedReceipts} liveKey="unallocatedReceipts" format="rupees" caption={<LiveReceiptCaption />} icon={BadgeIndianRupee} attention />
           </div>
         </section>
         <BalanceTrend />
@@ -28,16 +30,7 @@ export function Overview() {
             <div><h2>Records to review</h2><p>Disputes and payment holds</p></div>
             <Link className="text-link" href="/exceptions">View exceptions <ArrowRight size={15} aria-hidden="true" /></Link>
           </div>
-          <div className="list-rows">
-            {exceptions.slice(0, 3).map((item) => (
-              <Link href={`/exceptions?issue=${item.id}`} className="issue-row" key={item.id}>
-                <span className="issue-icon"><ShieldAlert size={16} aria-hidden="true" /></span>
-                <span className="issue-info"><strong>{item.party}</strong><small>{item.issue} · {item.reference}</small></span>
-                <span className="row-amount">{money(item.amount)}<small>Disputed</small></span>
-                <ChevronRight className="issue-chevron" size={16} aria-hidden="true" />
-              </Link>
-            ))}
-          </div>
+          <LiveReviewItems />
         </section>
         <section className="overview-section overview-assistant" aria-labelledby="overview-assistant-title">
           <div className="assistant-card-title">

@@ -32,7 +32,7 @@ export function LiveHistoryProvider({ active, children }: { active: boolean; chi
         if (!response.ok) throw new Error("History unavailable");
         return response.json() as Promise<History>;
       })
-      .then((data) => setState({ status: "ready", data }))
+      .then((data) => { if (!controller.signal.aborted) setState({ status: "ready", data }); })
       .catch(() => { if (!controller.signal.aborted) setState({ status: "error" }); });
     return () => controller.abort();
   }, [active, attempt]);

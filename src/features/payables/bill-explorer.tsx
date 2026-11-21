@@ -20,6 +20,7 @@ function LiveSupplierPaymentReview({ vendorId }: { vendorId?: string }) {
   const [data, setData] = useState<OpportunitiesResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -29,6 +30,7 @@ function LiveSupplierPaymentReview({ vendorId }: { vendorId?: string }) {
         return res.json() as Promise<OpportunitiesResult>;
       })
       .then((resData) => {
+        if (controller.signal.aborted) return;
         setData(resData);
         setLoading(false);
       })
@@ -39,7 +41,7 @@ function LiveSupplierPaymentReview({ vendorId }: { vendorId?: string }) {
         }
       });
     return () => controller.abort();
-  }, []);
+  }, [attempt]);
 
   const allReviews: BillPaymentReview[] = data?.paymentReview ?? [];
   const rows = vendorId ? allReviews.filter((r) => r.vendorId === vendorId) : allReviews;
@@ -49,7 +51,7 @@ function LiveSupplierPaymentReview({ vendorId }: { vendorId?: string }) {
       <header className="finance-panel-heading">
         <div>
           <h2>Supplier payment review</h2>
-          <p>Posted obligations ranked by criticality, terms, and MSME statutory deadlines.</p>
+          <p>Posted obligations ranked by due date, criticality, terms, and source MSME status.</p>
         </div>
       </header>
       <p className="footnote">
@@ -59,7 +61,7 @@ function LiveSupplierPaymentReview({ vendorId }: { vendorId?: string }) {
       {loading && <DataTableSkeleton columns={7} rows={8} />}
       {error && !loading && (
         <StateMessage icon={CircleAlert} title="Payment review unavailable" description="Failed to load supplier payment priorities from database.">
-          <button type="button" className="table-tool-button" onClick={() => setLoading(true)}>
+          <button type="button" className="table-tool-button" onClick={() => { setError(false); setLoading(true); setAttempt((value) => value + 1); }}>
             <RotateCcw size={16} aria-hidden="true" /> Try again
           </button>
         </StateMessage>
@@ -75,7 +77,7 @@ function LiveSupplierPaymentReview({ vendorId }: { vendorId?: string }) {
             { id: "bill", label: "Bill", cell: (row) => <span className="invoice-record"><span className="table-record-text"><strong>{row.number}</strong><small>{row.vendorName}</small></span></span> },
             { id: "due", label: "Due date", compare: (a, b) => a.due.localeCompare(b.due), cell: (row) => row.due },
             { id: "criticality", label: "Criticality", cell: (row) => row.criticality },
-            { id: "terms", label: "Terms", cell: (row) => `${row.termsDays ?? 30} days${row.msme ? " · MSME" : ""}` },
+            { id: "terms", label: "Terms", cell: (row) => `${row.termsDays === null ? "Unavailable" : `${row.termsDays} days`}${row.msme ? " · MSME" : ""}` },
             { id: "status", label: "Review status", cell: (row) => <span className={row.eligible ? "table-status current" : "table-status overdue"}>{row.eligible ? "Eligible for review" : "Blocked by controls"}</span> },
             { id: "outstanding", label: "Outstanding", align: "right", compare: (a, b) => a.outstanding - b.outstanding, cell: (row) => money(row.outstanding) },
             { id: "controls", label: "Controls", cell: (row) => row.hasHold ? "Payment hold active" : row.hasDispute ? "Commercial dispute" : "Clear" },

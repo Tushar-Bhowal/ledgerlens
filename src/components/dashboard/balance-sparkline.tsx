@@ -27,21 +27,27 @@ function LiveSparkline({ balance, label, state }: { balance: keyof typeof series
   const x = (index: number) => index * 160 / Math.max(1, rows.length - 1);
   const y = (value: number) => 32 - ((value - min) / (max - min)) * 28;
   const message = state.status === "loading" ? "Loading trend" : state.status === "error" ? "Trend unavailable" : available.length ? "2025 month-end trend" : "No trend data";
-  const pts = values.map((val, idx) => {
-    const py = val !== null && Number.isFinite(val) ? y(val) : 32;
-    return `${x(idx)},${py}`;
-  }).join(" ");
+  const segments: { index: number; value: number }[][] = [];
+  values.forEach((value, index) => {
+    if (value === null || !Number.isFinite(value)) return;
+    const last = segments.at(-1);
+    if (last?.at(-1)?.index === index - 1) last.push({ index, value });
+    else segments.push([{ index, value }]);
+  });
 
   return (
     <div className="balance-sparkline">
       <svg viewBox="0 0 160 34" preserveAspectRatio="none" role="img" aria-label={`${label}: ${message}`}>
         <line className="sparkline-baseline" x1="0" x2="160" y1={32} y2={32} vectorEffect="non-scaling-stroke" />
-        {available.length > 1 && (
-          <g className="chart-entrance">
-            <polygon className="sparkline-fill" points={`0,32 ${pts} 160,32`} />
-            <polyline className="sparkline-line" points={pts} vectorEffect="non-scaling-stroke" />
-          </g>
-        )}
+        {segments.map((segment) => {
+          const points = segment.map((point) => `${x(point.index)},${y(point.value)}`).join(" ");
+          return segment.length > 1 ? (
+            <g className="chart-entrance" key={segment[0].index}>
+              <polygon className="sparkline-fill" points={`${x(segment[0].index)},32 ${points} ${x(segment.at(-1)!.index)},32`} />
+              <polyline className="sparkline-line" points={points} vectorEffect="non-scaling-stroke" />
+            </g>
+          ) : <circle className="sparkline-line" key={segment[0].index} cx={x(segment[0].index)} cy={y(segment[0].value)} r="1.5" />;
+        })}
       </svg>
       <span aria-hidden="true">{message}</span>
     </div>

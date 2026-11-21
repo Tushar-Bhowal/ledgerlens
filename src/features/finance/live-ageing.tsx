@@ -36,7 +36,7 @@ export function LiveAgeing({ ledger }: { ledger: "ar" | "ap" }) {
         if (!response.ok) throw new Error("Ageing unavailable");
         return response.json() as Promise<Ageing>;
       })
-      .then((data) => setResult({ state: "ready", data }))
+      .then((data) => { if (!controller.signal.aborted) setResult({ state: "ready", data }); })
       .catch(() => { if (!controller.signal.aborted) setResult({ state: "error" }); });
     return () => controller.abort();
   }, [ledger, basis, boundaries, attempt]);

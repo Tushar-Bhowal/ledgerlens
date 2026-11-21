@@ -2,7 +2,7 @@ import "server-only";
 import { getDatabasePool } from "@/server/db";
 import { documentBalancesSql, reportingDate } from "./documents";
 
-export async function getCustomerPriorities() {
+export async function getCustomerPriorities(customerId?: string) {
   // Use the AR invoice balances behind the invoice table as the starting point for every customer.
   const result = await getDatabasePool().query<{ rows: unknown[]; rejectedRows: number }>(`
     WITH ${documentBalancesSql("ar")},
@@ -40,7 +40,7 @@ export async function getCustomerPriorities() {
       JOIN balances b ON b.id = f.invoice_id AND b.party_id = f.customer_id
       WHERE f.followup_status = 'Promise Broken'
         AND f.followup_date BETWEEN b.date AND $1::date
-        AND f.promise_to_pay_date <= $1::date
+        AND f.promise_to_pay_date BETWEEN f.followup_date AND $1::date
         AND b.status = 'overdue'
     ),
     payment_days AS (
@@ -64,11 +64,11 @@ export async function getCustomerPriorities() {
           (b.overdue - b.disputed) DESC, b.oldest_days DESC, p.days DESC NULLS LAST, c.customer_id
       ) AS rank,
       c.customer_id AS id, c.customer_name AS name, c.parent_group AS "group", c.region,
-      CASE WHEN b.incomplete THEN NULL ELSE b.outstanding::text END AS outstanding,
-      CASE WHEN b.incomplete THEN NULL ELSE b.overdue::text END AS overdue,
-      CASE WHEN b.incomplete THEN NULL ELSE b.disputed::text END AS disputed,
-      CASE WHEN b.incomplete THEN NULL ELSE (b.overdue - b.disputed)::text END AS actionable,
-      b.oldest_days AS "oldestDays", c.credit_limit_inr::text AS "limit",
+      CASE WHEN b.incomplete THEN NULL ELSE coalesce(b.outstanding, 0)::text END AS outstanding,
+      CASE WHEN b.incomplete THEN NULL ELSE coalesce(b.overdue, 0)::text END AS overdue,
+      CASE WHEN b.incomplete THEN NULL ELSE coalesce(b.disputed, 0)::text END AS disputed,
+      CASE WHEN b.incomplete THEN NULL ELSE (coalesce(b.overdue, 0) - coalesce(b.disputed, 0))::text END AS actionable,
+      coalesce(b.oldest_days, 0) AS "oldestDays", c.credit_limit_inr::text AS "limit",
       p.days::text AS "paymentDays",
       CASE WHEN b.incomplete THEN 'Incomplete'
         WHEN b.oldest_days > 90 OR (c.credit_limit_inr > 0 AND b.outstanding > c.credit_limit_inr) OR f.customer_id IS NOT NULL THEN 'High'
@@ -79,11 +79,12 @@ export async function getCustomerPriorities() {
         CASE WHEN c.credit_limit_inr > 0 AND b.outstanding > c.credit_limit_inr THEN 'Above current credit limit' END,
         CASE WHEN f.customer_id IS NOT NULL THEN 'Valid broken promise' END
       ], NULL) AS reasons
-    FROM customer_balances b
-    JOIN finance.customer_master c ON c.customer_id = b.party_id
+    FROM finance.customer_master c
+    LEFT JOIN customer_balances b ON c.customer_id = b.party_id
     LEFT JOIN broken_promises f ON f.customer_id = c.customer_id
     LEFT JOIN payment_days p ON p.party_id = c.customer_id
-    WHERE b.overdue > 0 OR b.incomplete
+    WHERE ($2::text IS NOT NULL AND c.customer_id = $2)
+      OR ($2::text IS NULL AND (b.overdue > 0 OR b.incomplete))
     ORDER BY b.incomplete ASC,
       (b.oldest_days > 90 OR COALESCE(c.credit_limit_inr > 0 AND b.outstanding > c.credit_limit_inr, false) OR f.customer_id IS NOT NULL) DESC,
       (b.overdue - b.disputed) DESC, b.oldest_days DESC, p.days DESC NULLS LAST, c.customer_id
@@ -91,6 +92,6 @@ export async function getCustomerPriorities() {
     SELECT COALESCE(json_agg(customer_results ORDER BY rank), '[]'::json) AS rows,
       (SELECT COUNT(*)::integer FROM finance.import_issues WHERE issue_code = 'rejected') AS "rejectedRows"
     FROM customer_results
-  `, [reportingDate]);
+  `, [reportingDate, customerId ?? null]);
   return { asOf: reportingDate, rows: result.rows[0].rows, rejectedRows: result.rows[0].rejectedRows };
 }

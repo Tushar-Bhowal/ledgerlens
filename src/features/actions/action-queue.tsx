@@ -27,6 +27,7 @@ export function ActionQueue() {
   const [liveOpp, setLiveOpp] = useState<OpportunitiesResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -36,6 +37,7 @@ export function ActionQueue() {
         return res.json() as Promise<OpportunitiesResult>;
       })
       .then((data) => {
+        if (controller.signal.aborted) return;
         setLiveOpp(data);
         setLoading(false);
       })
@@ -46,7 +48,7 @@ export function ActionQueue() {
         }
       });
     return () => controller.abort();
-  }, []);
+  }, [attempt]);
 
   const collectionActions: ActionItem[] = (liveOpp?.opportunities ?? []).slice(0, 15).map((opp) => ({
     id: `COL-${opp.id}`,
@@ -93,7 +95,7 @@ export function ActionQueue() {
       {loading && <DataTableSkeleton columns={6} rows={8} />}
       {error && !loading && (
         <StateMessage icon={CircleAlert} title="Action queue unavailable" description="Failed to load action items from database.">
-          <button type="button" className="table-tool-button" onClick={() => setLoading(true)}><RotateCcw size={16} aria-hidden="true" /> Try again</button>
+          <button type="button" className="table-tool-button" onClick={() => { setError(false); setLoading(true); setAttempt((value) => value + 1); }}><RotateCcw size={16} aria-hidden="true" /> Try again</button>
         </StateMessage>
       )}
 
