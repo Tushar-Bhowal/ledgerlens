@@ -1,0 +1,2 @@
+adjustment_id,invoice_id,customer_id,adjustment_date,adjustment_type,amount_inr,reference,status
+ARA00001,ARI00017,C004,2025-10-31,Credit Note,7500,CN-2025-001,Posted

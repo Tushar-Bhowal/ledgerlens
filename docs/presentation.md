@@ -1,63 +1,120 @@
-# LedgerLens presentation content
+# Prompt for creating the LedgerLens presentation
 
-Eight-slide content draft reconciled to isolated verification on 21 November 2026. The existing PPTX is a draft; final export, screenshots and visual validation remain pending.
+Create an editable **eight-slide PowerPoint** for DDL Labs assignment `DDL-FIN-001`. This prompt contains the project explanation, slide text, speaker notes, verified numbers and image placement. Use it as the complete writing brief. Four website screenshots are supplied separately. Use each image once on the slide specified below. Make the other slides with native PowerPoint text, tables and simple shapes. Use a clean dark visual style based on the screenshots, with readable type and generous spacing. Shorten sentences for slide layout when needed, while preserving their meaning and numbers. Include speaker notes from this prompt. Do not invent UI views, financial values, test results, a deployment URL or missing scenario screenshots.
 
-## 1. Problem and application
+LedgerLens is a finance decision-support application built with Next.js, React, TypeScript and PostgreSQL. It analyses accounts receivable (AR), accounts payable (AP), collection activity, supplier payment controls and financial exceptions. The source is 14 synthetic CSV files with 2,452 records. All displayed financial results use INR and a **31 December 2025** reporting cutoff. The Assistant routes questions to validated backend tools, and the financial services calculate the answers from PostgreSQL records. The six required tool paths were exercised in an isolated local database through deterministic routing. Actual external-provider operation and a full browser walkthrough have not been verified.
 
-- Finance managers need explainable customer collection and supplier payment decisions.
-- Six screens cover balances, AR, AP, exceptions, actions and a conversational Assistant.
-- Reporting snapshot: 31 December 2025, INR; original supplied source records.
+Use these four files, and no other images:
 
-## 2. Architecture and stack
+| Slide | Image file | What it actually shows |
+| --- | --- | --- |
+| 4 | `docs/screenshots/overview.png` | Overview with AR, AP, net trade balance, ageing, history and invoices |
+| 5 | `docs/screenshots/customer-profile.png` | Customer 21 risk profile, balances, credit limit, settlement days and invoice list |
+| 6 | `docs/screenshots/receivables-answer.png` | Assistant answer to “Why are receivables increasing?” |
+| 7 | `docs/screenshots/credit-limit-exception.png` | Exceptions drawer for `LIMIT-C024`, a credit-limit issue affecting Customer 24 |
 
-- Next.js, React, TypeScript and PostgreSQL.
-- CSV snapshot → transactional importer → source tables → financial services → APIs/screens/tools.
-- The LLM selects validated read-only tools; service wording and figures remain deterministic.
-- Gemini/Groq/OpenAI routing with bounded provider deadlines and deterministic fallback.
+Crop an image only to improve legibility. Preserve its labels and values. The Customer 21 profile and `LIMIT-C024` investigation are different records. The credit-limit drawer is an Exceptions view, not an Assistant reply. The images do not show all six Assistant scenarios, so describe the remaining scenarios with text. Avoid a crowded image collage.
 
-## 3. Data model and processing
+## Slide 1 — Working capital decisions from traceable records
 
-- Fourteen source tables, 2,452 records, zero rejected rows and two retained chronology warnings.
-- Exact numeric amounts, parent relationships, allocation tables and original CSV locations.
-- Checksummed migrations, advisory locks and atomic snapshot replacement.
-- Separate operational table for shared request/concurrency reservations.
+**Slide title:** LedgerLens
 
-## 4. Financial calculations
+**Slide subtitle:** Working capital intelligence for receivables, payables and financial exceptions
 
-- Net AR ₹3,94,93,294.91; net AP ₹1,65,42,512.87; net trade ₹2,29,50,782.04.
-- December AR: ₹3,52,14,000.31 + ₹63,69,153.74 − ₹20,89,859.14 = ₹3,94,93,294.91.
-- Canonical dated settlements drive current balances, daily bridges and historical snapshots.
-- Actual daily averages replace estimated factors; billing-based days are labelled proxies.
+**On-slide text:** Finance teams need to understand who owes money, which supplier bills need review and why a balance changed. LedgerLens connects transactions, controls and an Assistant to source-backed answers. DDL Labs finance assignment `DDL-FIN-001` · Snapshot 31 Dec 2025 · INR.
 
-## 5. Six scenario demonstration sequence
+**Visual:** Large title and one simple AR-to-AP flow. No screenshot.
 
-- Growth: opening/closing reconciliation and customer/bucket drivers.
-- Collections: capped disputes and ranked actionable balances.
-- Shortfalls: customer monthly due cohorts, cumulative gaps, overdue trends and labelled illustration.
-- Risk: exact customer profile, credit terms and source invoices.
-- Supplier priorities: eligible review versus holds/disputes/approval controls.
-- Investigation: exact exception identity, exposure and source evidence.
-- Final deck requires approved screenshots of the actual app for these demonstrations.
+**Speaker notes:** The application supports finance review rather than transactions. A reviewer can start with a portfolio figure, move to a customer or supplier and inspect the underlying invoices, allocations and adjustments. The supplied dataset is synthetic. Every amount in this presentation refers to its 31 December 2025 reporting snapshot.
 
-## 6. Findings and recommended reviews
+## Slide 2 — Architecture and stack
 
-- Overdue AR ₹3,25,71,982.61; disputed ₹92,635.23; actionable ₹3,24,79,347.38.
-- Unallocated receipts ₹85,000 across three receipts need matching review.
-- Current corrected rules produce 487 observations across ten populated categories.
-- Source exceptions are review flags, not evidence of fraud or guaranteed recoverable cash.
+**Slide title:** From CSV records to an explainable answer
 
-## 7. Decisions and limitations
+**On-slide flow:** 14 source CSVs → PostgreSQL source tables → TypeScript financial services → Next.js dashboard and Assistant.
 
-- Validated tools and exact SQL avoid assigning accounting arithmetic to the LLM.
-- Follow-up context retains source references and month, not trusted browser amounts.
-- Missing data stays unavailable. Formal DSO/DPO, CCC, bank/GL reconciliation and legal acceptance deadlines are unsupported.
-- Current statuses cannot reconstruct historical changes without dated history.
-- No payment, approval, limit-change, write-off or financial-ledger actions.
+**On-slide text:** Tracked migrations create the schema. A transactional importer loads the snapshot. Shared balance calculations handle invoice and bill settlement. The Assistant validates tool selection, calls read-only financial tools and returns service-calculated figures with evidence links. The stack is Next.js 16, React 19, TypeScript and PostgreSQL.
 
-## 8. Verification and delivery status
+**Visual:** A native PowerPoint flow diagram with four stages. No screenshot.
 
-- Twenty-eight isolated integration checks and twenty-seven CSV arithmetic assertions pass.
-- Independent source reviews caught and corrected period, scope, cutoff and test-quality gaps.
-- TypeScript, lint and Webpack production build pass.
-- Real provider, browser/mobile/keyboard/microphone and public deployment verification remain pending.
-- Final screenshot-based deck and live walkthrough are release evidence still to complete.
+**Speaker notes:** The original CSV identifiers and row locations remain available for audit. The model selects a permitted tool or asks for clarification; PostgreSQL services calculate financial values. The configured automatic provider sequence is Gemini, Groq and OpenAI, followed by deterministic routing when providers fail or return unusable results. Current code gives each provider an eight-second deadline. A requested change to Gemini waiting behavior remains open, so do not describe that behavior as completed.
+
+## Slide 3 — Data model and financial rules
+
+**Slide title:** Balances follow allocations and the reporting date
+
+**On-slide text:** Original invoices and bills link to receipts or payments through allocation tables. A partial payment reduces only the allocated portion. Signed adjustments change the outstanding balance. Cancelled and reversed documents remain inspectable while leaving active balances. Unallocated cash is tracked separately. Missing or inconsistent inputs can withhold affected measures.
+
+**Callout:** 2,452 rows imported · 0 rejected · 2 chronology warnings · ₹85,000.00 unallocated in 3 receipts.
+
+**Visual:** A small native diagram showing invoice → allocation ← receipt, plus the equivalent supplier bill relationship. No screenshot.
+
+**Speaker notes:** The core outstanding calculation starts from the document face value, subtracts eligible allocated cash and applies signed adjustments. Date rules prevent cash received after 31 December 2025 from changing the earlier closing balance. Original invoice dates are retained for ageing even after partial settlement. Import warnings remain visible as source-quality evidence.
+
+## Slide 4 — Portfolio and December movement
+
+**Slide title:** ₹3.95 crore receivable and ₹1.65 crore payable
+
+**On-slide figures:** Net AR ₹3,94,93,294.91 · Net AP ₹1,65,42,512.87 · Net trade balance ₹2,29,50,782.04. Overdue AR ₹3,25,71,982.61. Of that, ₹92,635.23 is capped disputed overdue, leaving ₹3,24,79,347.38 for collection review.
+
+**On-slide bridge:** December opening AR ₹3,52,14,000.31 + new postings ₹63,69,153.74 − applied receipts ₹20,89,859.14 + net adjustments ₹0 = closing AR ₹3,94,93,294.91.
+
+**Image:** `docs/screenshots/overview.png`. Give the image enough space for the figures and history chart to remain legible.
+
+**Speaker notes:** Receivables increased by ₹42,79,294.60 during December because postings exceeded applied cash. The actionable overdue figure is a balance requiring review, not a promised recovery amount. The Overview image shows rounded crore values; the exact amounts above come from isolated PostgreSQL verification.
+
+## Slide 5 — Source evidence and decision boundaries
+
+**Slide title:** Move from a risk signal to its invoices
+
+**On-slide text:** The customer profile connects current exposure, overdue amount, credit limit, settlement timing and individual invoices. An Assistant follow-up can retain a validated customer, issue or month reference. The application provides advice and evidence; it cannot initiate or approve payments, change credit limits, write off debt or update ledgers.
+
+**Image:** `docs/screenshots/customer-profile.png`. Caption it “Customer 21 profile and invoice evidence.”
+
+**Speaker notes:** This is a live customer profile view. It shows Customer 21 with ₹16,37,605.24 positive outstanding, ₹15,40,092.18 overdue, a ₹7,50,000 current credit limit and 68.3 settlement days. The source does not contain a history of credit-limit revisions. Supplied dispute and follow-up rows are not yet surfaced in this profile, so the image should not be described as showing them.
+
+## Slide 6 — Required scenarios 1–3
+
+**Slide title:** Receivables movement, collections and payment shortfalls
+
+**Image:** `docs/screenshots/receivables-answer.png`, labelled “Actual Assistant answer for receivables growth.”
+
+**On-slide scenario text:**
+
+1. **Why are receivables increasing?** The shown answer reports a ₹42,79,294.60 December increase, ₹63,69,153.74 in postings and ₹20,89,859.14 in applied receipts. It also identifies the largest ageing-bucket increase and leading customer contributors.
+2. **Who needs collection attention?** The tool ranks customers using overdue exposure, delay, credit utilisation, valid broken promises and disputes. The Assistant links to invoice records and a separate opportunities screen. Its current reply does not itself provide the requested invoice-level action list.
+3. **Who pays less than billed?** The tool compares monthly billing, cash received, due cohorts, cumulative shortfalls and overdue trends. A one-month balance illustration continues the mean of three complete months and is labelled as an illustration, not a forecast.
+
+**Speaker notes:** The screenshot supports scenario 1 only. The isolated integration check exercised all three backend tool paths with source links. It did not establish browser or real-provider behavior for each question. The shortfall calculation distinguishes historical cohort gaps from today's collectible balance because later receipts can settle older invoices.
+
+## Slide 7 — Required scenarios 4–6
+
+**Slide title:** Customer risk, supplier review and exception investigation
+
+**Image:** `docs/screenshots/credit-limit-exception.png`, labelled “Credit-limit investigation in Exceptions.” The drawer shows `LIMIT-C024`, Customer 24, High severity, ₹22,40,121.04 supported amount and source references.
+
+**On-slide scenario text:**
+
+4. **Why is a customer high risk?** The tool resolves a customer ID or full name and reports current limit, terms, overdue invoices and payment timing. Historical limit revisions are unavailable. The screenshot on slide 5 shows a separate Customer 21 profile.
+5. **Which supplier payments need priority?** The review considers due bills, supplier criticality, MSME source flags, holds and disputes. Pending approval on a posted payment is a separate control exception and is not yet connected to each affected bill in the priority view. The application does not execute payments.
+6. **Investigate an exception.** A named issue returns its reason, supported amount, recommended review and source references. The shown `LIMIT-C024` issue flags a credit-limit breach. The isolated Assistant scenario check used a different issue, `HLD0001`.
+
+**Speaker notes:** The Exceptions image demonstrates a source investigation view. It is not proof that the Assistant answered a question about `LIMIT-C024`. A generic duplicate-invoice question can select an unrelated exception, and the current duplicate rule misses seeded cross-party reference collisions. Do not claim the app proves fraud or that duplicate detection is fully verified.
+
+## Slide 8 — Verification, limits and delivery
+
+**Slide title:** What was checked and what the data cannot answer
+
+**On-slide text:** On 21 November 2026, 27 CSV arithmetic assertions and 28 isolated PostgreSQL integration checks passed. TypeScript checking and lint passed. The integration checks covered balance arithmetic, history, six deterministic scenario tool paths, evidence, failure handling and mocked provider responses.
+
+**Data limits:** Inventory, COGS, separately identified net credit sales, bank statements, GL balances and credit-limit revision history were not supplied. Formal DSO, DPO, full cash conversion cycle and bank reconciliation are therefore unavailable. Billing-based days values are labelled proxies.
+
+**Verification limits:** Real provider credentials, quota and latency, complete browser/mobile interaction and public deployment remain unverified. The final presentation is a description of the current application and its measured local checks.
+
+**Visual:** Two-column text layout with a small verification table. No screenshot.
+
+**Speaker notes:** The source data supports detailed AR and AP review, but it cannot establish every accounting or operating metric. The reported test counts reflect local checks against synthetic data. They do not justify a universal accuracy claim or a cash recovery forecast. Close by saying LedgerLens makes working-capital review more traceable and gives finance teams a concrete starting point for investigation.
+
+## Final production instructions
+
+Deliver one editable `.pptx` with exactly eight slides, embedded speaker notes and the four supplied screenshots in their assigned slides. Check spelling, Indian number formatting, screenshot readability and the arithmetic in slide 4. Keep visible slide text concise while retaining the full explanations in speaker notes. Use no additional images or unsupported claims.

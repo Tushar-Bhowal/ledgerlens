@@ -1,0 +1,5 @@
+hold_id,vendor_id,bill_id,hold_date,hold_reason,hold_status,released_date
+HLD0001,V008,API00019,2025-11-20,Missing GRN,Active,
+HLD0002,V005,API00111,2025-11-20,Invoice dispute,Active,
+HLD0003,V004,API00222,2025-11-20,Rate mismatch,Active,
+HLD0004,V008,API00275,2025-11-20,Invoice dispute,Released,2025-12-05

@@ -1,0 +1,9 @@
+dispute_id,party_type,party_id,invoice_id,bill_id,raised_date,dispute_reason,disputed_amount_inr,status
+DSP0001,Customer,C007,ARI00031,,2025-10-15,Short supply,15240.62,Open
+DSP0002,Customer,C019,ARI00122,,2025-10-15,Quantity mismatch,43006.85,Resolved
+DSP0003,Customer,C014,ARI00270,,2025-10-15,Quantity mismatch,21939.59,Resolved
+DSP0004,Customer,C023,ARI00401,,2025-10-15,Service issue,16648.97,Open
+DSP0005,Customer,C024,ARI00510,,2025-10-15,Short supply,60745.64,Under Review
+DSP0006,Vendor,V008,,API00019,2025-11-01,PO / invoice rate mismatch,15844.81,Open
+DSP0007,Vendor,V005,,API00111,2025-11-01,PO / invoice rate mismatch,10113.74,Open
+DSP0008,Vendor,V004,,API00222,2025-11-01,PO / invoice rate mismatch,5744.26,Open

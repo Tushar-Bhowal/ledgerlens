@@ -1,0 +1,31 @@
+customer_id,customer_name,parent_group,industry,region,business_unit,salesperson_id,credit_limit_inr,credit_period_days,payment_terms,risk_segment,related_party_flag,status
+C001,Customer 01 Pvt Ltd,Group 01,Manufacturing,North,BU-1,SP-01,300000,15,Net 45,Low,False,Active
+C002,Customer 02 Pvt Ltd,Group 01,Trading,South,BU-2,SP-02,500000,30,Net 30,Low,False,Active
+C003,Customer 03 Pvt Ltd,Group 01,FMCG,East,BU-3,SP-03,300000,15,Net 60,High,False,Active
+C004,Customer 04 Pvt Ltd,Group 02,Construction,West,BU-4,SP-04,300000,15,Net 15,Low,False,Active
+C005,Customer 05 Pvt Ltd,Group 02,IT Services,Central,BU-1,SP-05,500000,30,Net 15,Low,True,Active
+C006,Customer 06 Pvt Ltd,Group 02,Manufacturing,North,BU-2,SP-06,1500000,30,Net 60,Medium,False,Active
+C007,Customer 07 Pvt Ltd,Group 03,Trading,South,BU-3,SP-01,500000,60,Net 45,High,False,Active
+C008,Customer 08 Pvt Ltd,Group 03,FMCG,East,BU-4,SP-02,300000,30,Net 60,Low,False,Active
+C009,Customer 09 Pvt Ltd,Group 03,Construction,West,BU-1,SP-03,750000,45,Net 30,Medium,False,Active
+C010,Customer 10 Pvt Ltd,Group 04,IT Services,Central,BU-2,SP-04,500000,45,Net 15,Low,False,Active
+C011,Customer 11 Pvt Ltd,Group 04,Manufacturing,North,BU-3,SP-05,300000,60,Net 15,High,False,Active
+C012,Customer 12 Pvt Ltd,Group 04,Trading,South,BU-4,SP-06,750000,45,Net 45,Medium,False,Active
+C013,Customer 13 Pvt Ltd,Group 05,FMCG,East,BU-1,SP-01,300000,60,Net 15,Low,False,Active
+C014,Customer 14 Pvt Ltd,Group 05,Construction,West,BU-2,SP-02,1000000,15,Net 45,Low,False,Active
+C015,Customer 15 Pvt Ltd,Group 05,IT Services,Central,BU-3,SP-03,1500000,45,Net 30,Medium,False,Active
+C016,Customer 16 Pvt Ltd,Group 06,Manufacturing,North,BU-4,SP-04,300000,15,Net 30,Low,False,Active
+C017,Customer 17 Pvt Ltd,Group 06,Trading,South,BU-1,SP-05,750000,15,Net 30,Low,False,Active
+C018,Customer 18 Pvt Ltd,Group 06,FMCG,East,BU-2,SP-06,300000,60,Net 45,High,False,Active
+C019,Customer 19 Pvt Ltd,Group 07,Construction,West,BU-3,SP-01,1000000,45,Net 30,Low,False,Active
+C020,Customer 20 Pvt Ltd,Group 07,IT Services,Central,BU-4,SP-02,750000,45,Net 30,Low,True,Active
+C021,Customer 21 Pvt Ltd,Group 07,Manufacturing,North,BU-1,SP-03,750000,15,Net 30,Medium,False,Active
+C022,Customer 22 Pvt Ltd,Group 08,Trading,South,BU-2,SP-04,1500000,30,Net 30,Low,False,Active
+C023,Customer 23 Pvt Ltd,Group 08,FMCG,East,BU-3,SP-05,1000000,60,Net 45,Low,False,Active
+C024,Customer 24 Pvt Ltd,Group 08,Construction,West,BU-4,SP-06,1500000,30,Net 45,High,False,Active
+C025,Customer 25 Pvt Ltd,Group 09,IT Services,Central,BU-1,SP-01,300000,30,Net 15,Low,False,Active
+C026,Customer 26 Pvt Ltd,Group 09,Manufacturing,North,BU-2,SP-02,750000,60,Net 45,Low,False,Active
+C027,Customer 27 Pvt Ltd,Group 09,Trading,South,BU-3,SP-03,300000,30,Net 45,Medium,False,Active
+C028,Customer 28 Pvt Ltd,Group 10,FMCG,East,BU-4,SP-04,500000,60,Net 60,Low,False,Active
+C029,Customer 29 Pvt Ltd,Group 10,Construction,West,BU-1,SP-05,1000000,30,Net 45,Low,False,Active
+C030,Customer 30 Pvt Ltd,Group 10,IT Services,Central,BU-2,SP-06,500000,30,Net 45,Medium,False,Active

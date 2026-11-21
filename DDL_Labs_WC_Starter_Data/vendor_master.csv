@@ -1,0 +1,13 @@
+vendor_id,vendor_name,vendor_group,category,region,msme_flag,criticality,payment_terms_days,status
+V001,Vendor 01 Industries,Supplier Group 01,IT Services,North,False,Critical,60,Active
+V002,Vendor 02 Industries,Supplier Group 01,IT Services,South,True,Critical,60,Active
+V003,Vendor 03 Industries,Supplier Group 02,Professional Services,East,False,Normal,30,Active
+V004,Vendor 04 Industries,Supplier Group 02,Logistics,West,False,Normal,60,Active
+V005,Vendor 05 Industries,Supplier Group 03,Raw Material,Central,False,Critical,15,Active
+V006,Vendor 06 Industries,Supplier Group 03,Raw Material,North,True,Normal,30,Active
+V007,Vendor 07 Industries,Supplier Group 04,Logistics,South,False,Normal,60,Active
+V008,Vendor 08 Industries,Supplier Group 04,IT Services,East,False,Normal,15,Active
+V009,Vendor 09 Industries,Supplier Group 05,Packaging,West,True,Normal,60,Active
+V010,Vendor 10 Industries,Supplier Group 05,IT Services,Central,False,Normal,60,Active
+V011,Vendor 11 Industries,Supplier Group 06,IT Services,North,False,Normal,45,Active
+V012,Vendor 12 Industries,Supplier Group 06,IT Services,South,False,Normal,15,Active

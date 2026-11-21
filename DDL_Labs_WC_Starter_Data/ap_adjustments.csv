@@ -1,0 +1,2 @@
+adjustment_id,bill_id,vendor_id,adjustment_date,adjustment_type,amount_inr,reference,status
+APA00001,API00033,V008,2025-11-15,Debit Note,3200,DN-AP-2025-001,Posted

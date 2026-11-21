@@ -1,0 +1,9 @@
+followup_id,customer_id,invoice_id,followup_date,contact_method,promise_to_pay_date,promised_amount_inr,followup_status,owner_id,notes
+FUP0001,C003,ARI00147,2025-10-08,Email,2025-10-25,49292.67,No Response,COL-02,Synthetic follow-up record
+FUP0002,C007,ARI00479,2025-10-15,WhatsApp,2025-10-30,12626.58,Promise Broken,COL-03,Synthetic follow-up record
+FUP0003,C011,ARI00287,2025-10-22,WhatsApp,2025-11-04,26957.83,Promise Broken,COL-01,Synthetic follow-up record
+FUP0004,C018,ARI00008,2025-10-29,Email,2025-11-09,52482.53,No Response,COL-02,Synthetic follow-up record
+FUP0005,C024,ARI00261,2025-11-05,Phone,2025-11-14,59981.6,No Response,COL-03,Synthetic follow-up record
+FUP0006,C003,ARI00071,2025-11-12,Email,2025-11-19,33192.55,Promise Broken,COL-01,Synthetic follow-up record
+FUP0007,C007,ARI00360,2025-11-19,Email,2025-11-24,47397.77,Promise Broken,COL-02,Synthetic follow-up record
+FUP0008,C012,ARI00176,2025-11-26,Email,2025-11-29,53830.83,No Response,COL-03,Synthetic follow-up record

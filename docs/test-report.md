@@ -1,10 +1,10 @@
 # LedgerLens verification report
 
-Executed 21 November 2026 against PostgreSQL 18 in a temporary local database, imported from the supplied 14 CSVs. Production Neon records and external LLMs were not used by these checks.
+Executed 21 November 2026 against PostgreSQL 18 in a temporary local `ledgerlens_review` database. `npm run db:setup` applied migrations 001 and 002 and imported the supplied 14 CSVs. Production Neon records and external LLMs were not used by these checks. The temporary PostgreSQL instance was stopped after verification.
 
 ## Actual results
 
-`npm run test:integration`: **28 passed, 0 failed**. The script refuses remote databases and databases not named `ledgerlens_*`. Fixtures are transactionally rolled back; operational limiter records are cleared only in the isolated database.
+`npm test`: **27 CSV arithmetic assertions passed**. `npm run test:integration`: **28 checks passed, 0 failed**. ESLint completed with zero warnings and TypeScript checking passed. The integration script refuses remote databases and databases not named `ledgerlens_*`. Fixtures are transactionally rolled back; operational limiter records are cleared only in the isolated database.
 
 | Verified value | Result |
 |---|---:|
@@ -35,7 +35,7 @@ Formal DSO/DPO are unavailable because net credit sales/COGS are not separately 
 5. Supplier priorities: actual eligible/blocked source rows and evidence. Human review only; no payment execution. Legal deadlines are not inferred from an MSME flag.
 6. Exception investigation: expected tool and HLD0001 identity, source evidence and live context replay.
 
-The scenario test asserts the expected tool, populated facts/tables and source links, not merely that any answer appeared.
+The scenario check asserts the expected tool, populated facts/tables and source links. It uses deterministic system routing. The exception case is the known hold `HLD0001`; the generic duplicate-invoice prompt and seeded cross-party reference collisions are not covered by that check.
 
 ## Adversarial and failure checks
 
@@ -59,6 +59,8 @@ The scenario test asserts the expected tool, populated facts/tables and source l
 
 Provider responses are mocked. Real API credentials, quota, model tool-calling compatibility and wall-clock provider latency are unverified. Browser layout, desktop/mobile, keyboard, microphone, public deployment and screenshot-based presentation demonstrations were not tested. No production latency, universal accuracy, recovery ROI or zero-hallucination guarantee is asserted.
 
-Run commands and source are in README and `scripts/verify-completion.ts`. `npm test` is a separate CSV arithmetic check, not a production API/LLM benchmark.
+The current Assistant times out a provider after eight seconds, which conflicts with the recorded preference to wait for Gemini until it replies or fails. The checks do not establish that all assignment scenario details are complete. Collection replies lack an invoice-level action list. The customer risk profile omits supplied dispute and follow-up rows. Supplier bill priorities do not connect pending approval of related posted payments to their review. A generic duplicate prompt can return an unrelated exception, and the same-party duplicate rule misses the supplied cross-party reference collisions. A non-December receivables answer links to a December period view. These are recorded in `.phurti/plans/audit-findings-assignment-status.md`.
 
-The user explicitly kept live-provider and browser checks deferred on 21 November 2026 after the isolated checks passed.
+The new `db:reset` command was reviewed but not executed in this verification. Presentation authoring remains open. `docs/presentation.md` supplies a factual slide brief, and the final PowerPoint still requires actual scenario screenshots.
+
+Reviewer commands and source are in README and `scripts/verify-completion.ts`. `npm test` reads the bundled CSVs; it is not a production API or model benchmark. Real-provider and browser checks were explicitly deferred on 21 November 2026.

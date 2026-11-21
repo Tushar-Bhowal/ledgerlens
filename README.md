@@ -41,11 +41,10 @@ npm ci
 cp .env.example .env.local
 ```
 
-Set `DATABASE_URL` and `DATABASE_URL_UNPOOLED` in the ignored environment file. Place the original CSVs in `DDL_Labs_WC_Starter_Data/`, then:
+Set `DATABASE_URL` and `DATABASE_URL_UNPOOLED` in `.env.local`. For Neon, use the pooled connection for `DATABASE_URL` and the direct connection for `DATABASE_URL_UNPOOLED`, both from the same branch and database. For local PostgreSQL, use the same local connection string for both with `sslmode=disable`. The supplied synthetic CSVs are in `DDL_Labs_WC_Starter_Data/`. Then run:
 
 ```sh
-npm run migrate
-npm run import:data
+npm run db:setup
 npm run dev
 ```
 
@@ -53,15 +52,17 @@ Open http://localhost:3000. For production, run `npm run build` then `npm start`
 
 `001_finance.sql` creates the source schema. `002_chat_requests.sql` creates the shared request-limit table; **apply both migrations before using Assistant**. The importer atomically replaces the finance source snapshot and import issues; it does not replace operational request-limit records. Never run an import against a database you intend to preserve without reviewing that snapshot-replacement behaviour.
 
+`npm run db:setup` runs migrations followed by an import. Running it again replaces the existing finance snapshot with the CSV files. To use a different dataset, provide all 14 CSVs with the same filenames and headers and run `npm run import:data -- /path/to/csv-directory`. To clear finance data without dropping the schema or chat request records, run `npm run db:reset -- --confirm`. This permanently deletes the imported snapshot and import issues in the database selected by `DATABASE_URL_UNPOOLED`. Run `npm run import:data` to reload the bundled snapshot. Use an isolated database or Neon branch for review.
+
 For optional Docker PostgreSQL, set `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` and optionally `POSTGRES_PORT` in `.env`, run `docker compose up -d postgres`, and point both database URLs at that local instance with `sslmode=disable`. Remote connections enforce certificate verification.
 
 ## AI configuration
 
-Configure `GEMINI_API_KEY`, `GROQ_API_KEY` or `OPENAI_API_KEY` on the server. Default routing order is Gemini, Groq, then OpenAI. Current bundled model defaults are `gemini-3.8-flash`, `openai/gpt-oss-120b` and `gpt-4o-mini`. Explicit provider selection uses only that provider; recognized questions can still fall back to deterministic live tools.
+Configure `GEMINI_API_KEY`, `GROQ_API_KEY` or `OPENAI_API_KEY` on the server. Default routing order is Gemini, Groq, then OpenAI. Current bundled model defaults are `gemini-flash-lite-latest`, `openai/gpt-oss-120b` and `gpt-4o-mini`. Explicit provider selection uses only that provider; recognized questions can still fall back to deterministic live tools.
 
 AI Config also accepts user-supplied Gemini/Groq keys and retrieves account model catalogs through server-side POST requests. Saved keys persist in this browser's localStorage until cleared. Catalog visibility is not proof of completion/tool-calling access or available quota. Credentials are not included in source code or application logs.
 
-A model selects an allowlisted financial tool or clarification action. Arguments are validated; PostgreSQL services compute facts. Financial replies use deterministic service wording rather than an unvalidated model rewrite. Follow-up context contains source references, not trusted amounts. Chat has no application-imposed provider or overall response deadline. It waits for the selected provider and falls back on errors or unusable replies. Stop cancels provider work; database queries keep their own timeout. Hosting platforms and network transports may still impose limits. Active request-limit leases renew while the provider is working.
+A model selects an allowlisted financial tool or clarification action. Arguments are validated; PostgreSQL services compute facts. Financial replies use deterministic service wording rather than an unvalidated model rewrite. Follow-up context contains source references, not trusted amounts. The current chat implementation gives each provider eight seconds before trying the next provider or deterministic route. This conflicts with the requested Gemini wait behavior and remains open. Stop cancels provider work; database queries keep their own timeout. Hosting platforms and network transports may still impose limits. Active request-limit leases renew while the provider is working.
 
 Shared limits allow 10 requests per minute and 2 concurrent requests per client identity, with a global 20-request concurrency cap. Vercel's forwarded client identity is trusted automatically. Set `TRUST_PROXY_HEADERS=true` only behind a proxy that overwrites forwarded headers; other environments share a conservative local identity. Public authentication and per-user authorization are not implemented; use access controls before exposing confidential datasets.
 
@@ -118,4 +119,4 @@ The integration runner refuses remote/nonverification databases. Adversarial fin
 - [Executive summary](docs/executive-summary.md)
 - [Presentation content](docs/presentation.md)
 
-The original dataset is excluded from Git and must be supplied separately for reproducibility. No public application URL has been recorded. Screenshot-based scenario demonstrations, live provider validation and the final presentation export require their own completion evidence; do not present the existing draft PPTX as a verified final submission.
+The supplied dataset is synthetic and included for reproducibility. No public application URL has been recorded. `docs/presentation.md` is a brief for producing the final PowerPoint with actual scenario screenshots. Live provider validation and final presentation review remain pending.
