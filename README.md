@@ -2,6 +2,12 @@
 
 A Next.js, React, TypeScript and PostgreSQL application for the DDL Labs assignment `DDL-FIN-001`. The supplied dataset contains 14 CSV files and 2,452 records. Reporting uses **31 December 2025, INR**.
 
+## Live application
+
+[Open LedgerLens](https://ledgerlens-tau-mauve.vercel.app/)
+
+I tested the deployed link in the browser on 21 November 2026. It returned HTTP 200 and rendered the Overview dashboard with the expected financial summary; no failed HTTP responses or page errors were observed during the reload check. This verifies the link and landing page, not every application workflow or provider configuration.
+
 ## Implemented
 
 - Six live screens: Overview, Receivables, Payables, Exceptions, Actions and Assistant.
@@ -12,7 +18,7 @@ A Next.js, React, TypeScript and PostgreSQL application for the DDL Labs assignm
 - Read-only Assistant: validated tool calls, customer-name lookup, retained tool/reference context, live evidence follow-ups, provider fallback and cancellation.
 - PostgreSQL-backed request and concurrency limits shared across application instances.
 
-Implementation is not a claim of universal accuracy. The approved isolated verification passes 38 focused checks. A separate live Gemini smoke check confirmed five model-selected tools and the direct customer-risk path against local PostgreSQL. Browser/mobile/keyboard/microphone behaviour, other real providers, sustained quota and public deployment remain unverified.
+Implementation is not a claim of universal accuracy. The approved isolated verification passes 38 focused checks. A separate live Gemini smoke check confirmed five model-selected tools and the direct customer-risk path against local PostgreSQL. The public link and Overview dashboard were browser-checked on 21 November 2026; other real providers, complete application workflows, mobile/keyboard/microphone behaviour and sustained quota were not exercised.
 
 ## Financial snapshot
 
@@ -123,4 +129,4 @@ The integration runner refuses remote/nonverification databases. Adversarial fin
 - [Final presentation](docs/LedgerLens_Final.pptx)
 - [Presentation brief](docs/presentation.md)
 
-The supplied dataset is synthetic and included for reproducibility. No public application URL has been recorded. The final eight-slide deck is `docs/LedgerLens_Final.pptx`; its content, speaker notes and file structure were reviewed against the implementation and verification report. Full rendered-slide layout inspection was not completed. The live Gemini code checks and their limits are recorded in the test report.
+The supplied dataset is synthetic and included for reproducibility. The public application URL is [https://ledgerlens-tau-mauve.vercel.app/](https://ledgerlens-tau-mauve.vercel.app/). The final eight-slide deck is `docs/LedgerLens_Final.pptx`; its content, speaker notes and file structure were reviewed against the implementation and verification report. Full rendered-slide layout inspection was not completed. The live Gemini code checks and their limits are recorded in the test report.

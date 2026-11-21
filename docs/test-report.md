@@ -57,7 +57,7 @@ The scenario check asserts the expected tool, populated facts/tables and source 
 
 ## Limits of this evidence
 
-The isolated integration suite mocks provider responses. A separate code-only live check used configured Gemini credentials against the temporary local database: receivables growth, collections, short payments, vendor priorities and named exception investigation each received HTTP 200 with the expected model-selected tool and a backend answer containing evidence. Customer risk intentionally routes a resolved customer name directly to the backend; that path also returned its expected answer and evidence. These six checks ran in two batches. They establish those specific paths, not all possible wording, providers, sustained quota or production latency. Browser layout, desktop/mobile, keyboard, microphone, public deployment and screenshot-based presentation demonstrations were not tested. No production latency, universal accuracy, recovery ROI or zero-hallucination guarantee is asserted.
+The isolated integration suite mocks provider responses. A separate code-only live check used configured Gemini credentials against the temporary local database: receivables growth, collections, short payments, vendor priorities and named exception investigation each received HTTP 200 with the expected model-selected tool and a backend answer containing evidence. Customer risk intentionally routes a resolved customer name directly to the backend; that path also returned its expected answer and evidence. These six checks ran in two batches. They establish those specific paths, not all possible wording, providers, sustained quota or production latency. The deployed public link and Overview page were browser-checked on 21 November 2026; responsive layout, keyboard, microphone and screenshot-based presentation behavior were not exercised. No production latency, universal accuracy, recovery ROI or zero-hallucination guarantee is asserted.
 
 ## Regression coverage added for scenario completion
 
@@ -80,4 +80,8 @@ Four further integration checks retain the previous 34 and cover original ARR/AP
 
 The receipt/payment investigation drawer now loads source details instead of stopping at an ID. Raw allocation audit includes inactive and future rows, explicitly separated from cutoff-effective amounts. TypeScript, lint and the Webpack production build passed; no browser or paid-provider checks were used for these final fixes.
 
-Reviewer commands and source are in README and `scripts/verify-completion.ts`. `npm test` reads the bundled CSVs; it is not a production API or model benchmark. Earlier deferral was superseded by approval for the code-only checks above. Browser checks remain excluded.
+Reviewer commands and source are in README and `scripts/verify-completion.ts`. `npm test` reads the bundled CSVs; it is not a production API or model benchmark. Earlier deferral was superseded by approval for the code-only checks above. The deployment link check is documented below; it was limited to the public landing page.
+
+## Deployment verification
+
+On 21 November 2026, I opened the deployed application in the browser: [LedgerLens live application](https://ledgerlens-tau-mauve.vercel.app/). The page returned HTTP 200, displayed the Overview heading and rendered the expected summary balances: receivables ₹3,94,93,294.91, payables ₹1,65,42,512.87 and net trade balance ₹2,29,50,782.04. No failed HTTP responses or page errors were observed during the reload check. This confirms the public link and landing page loaded at the time of the check; financial scenario checks above used isolated local PostgreSQL.

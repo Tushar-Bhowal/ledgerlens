@@ -4,7 +4,7 @@ The final deck is [LedgerLens_Final.pptx](LedgerLens_Final.pptx). This brief rec
 
 Create an editable **eight-slide PowerPoint** for DDL Labs assignment `DDL-FIN-001`. This prompt contains the project explanation, slide text, speaker notes, verified numbers and image placement. Use it as the complete writing brief. Four website screenshots are supplied separately. Use each image once on the slide specified below. Make the other slides with native PowerPoint text, tables and simple shapes. Use a clean dark visual style based on the screenshots, with readable type and generous spacing. Shorten sentences for slide layout when needed, while preserving their meaning and numbers. Include speaker notes from this prompt. Do not invent UI views, financial values, test results, a deployment URL or missing scenario screenshots.
 
-LedgerLens is a finance decision-support application built with Next.js, React, TypeScript and PostgreSQL. It analyses accounts receivable (AR), accounts payable (AP), collection activity, supplier payment controls and financial exceptions. The source is 14 synthetic CSV files with 2,452 records. All displayed financial results use INR and a **31 December 2025** reporting cutoff. The Assistant routes questions to validated backend tools, and the financial services calculate the answers from PostgreSQL records. The six required tool paths were exercised in an isolated local database through deterministic routing. A separate code-only check verified five real Gemini tool selections and the direct customer-risk path; a full browser walkthrough remains unverified.
+LedgerLens is a finance decision-support application built with Next.js, React, TypeScript and PostgreSQL. It analyses accounts receivable (AR), accounts payable (AP), collection activity, supplier payment controls and financial exceptions. The source is 14 synthetic CSV files with 2,452 records. All displayed financial results use INR and a **31 December 2025** reporting cutoff. The Assistant routes questions to validated backend tools, and the financial services calculate the answers from PostgreSQL records. The six required tool paths were exercised in an isolated local database through deterministic routing. A separate code-only check verified five real Gemini tool selections and the direct customer-risk path. The deployed Overview page also loaded successfully in a browser check; this did not exercise a full browser walkthrough.
 
 Use these four files, and no other images:
 
@@ -16,6 +16,8 @@ Use these four files, and no other images:
 | 7 | `docs/screenshots/credit-limit-exception.png` | Exceptions drawer for `LIMIT-C024`, a credit-limit issue affecting Customer 24 |
 
 Crop an image only to improve legibility. Preserve its labels and values. The Customer 21 profile and `LIMIT-C024` investigation are different records. The credit-limit drawer is an Exceptions view, not an Assistant reply. The images do not show all six Assistant scenarios, so describe the remaining scenarios with text. Avoid a crowded image collage.
+
+**Browser-tested deployment link (21 November 2026):** [LedgerLens live application](https://ledgerlens-tau-mauve.vercel.app/). The link returned HTTP 200 and rendered the Overview dashboard; financial scenario checks used isolated local PostgreSQL.
 
 ## Slide 1 — Working capital decisions from traceable records
 
