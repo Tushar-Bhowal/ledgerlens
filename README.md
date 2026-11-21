@@ -8,6 +8,135 @@ A Next.js, React, TypeScript and PostgreSQL application for the DDL Labs assignm
 
 I tested the deployed link in the browser on 21 November 2026. It returned HTTP 200 and rendered the Overview dashboard with the expected financial summary; no failed HTTP responses or page errors were observed during the reload check. This verifies the link and landing page, not every application workflow or provider configuration.
 
+## Clone and run locally
+
+### Requirements
+
+- Git
+- [Node.js 24.x or 26.x](https://nodejs.org/en/download) with npm
+- [Docker Desktop or Docker Engine](https://docs.docker.com/get-docker/) with Docker Compose (recommended for local PostgreSQL)
+- Optional: a Neon account instead of local PostgreSQL, and an AI provider key for model-assisted Assistant routing
+
+### 1. Clone and install
+
+```sh
+git clone https://github.com/Tushar-Bhowal/ledgerlens.git
+cd ledgerlens
+npm ci
+cp .env.example .env.local
+```
+
+`.env.local` is ignored by Git. Keep credentials there; do not commit or email this file.
+
+### 2. Choose a database
+
+#### Option A: local PostgreSQL with Docker
+
+Edit `.env.local` and set these local-only values. Use the same username, password, database and port in both URLs. This example password is for local development only; replace it with a password of your own. If you use special characters in a password, URL-encode them in the connection URLs.
+
+```dotenv
+POSTGRES_USER=ledgerlens
+POSTGRES_PASSWORD=replace_with_a_local_password
+POSTGRES_DB=ledgerlens_local
+POSTGRES_PORT=5432
+
+DATABASE_URL=postgresql://ledgerlens:replace_with_a_local_password@127.0.0.1:5432/ledgerlens_local?sslmode=disable
+DATABASE_URL_UNPOOLED=postgresql://ledgerlens:replace_with_a_local_password@127.0.0.1:5432/ledgerlens_local?sslmode=disable
+
+# Gemini API key and Gemini model ID
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-flash-lite-latest
+
+# Groq Cloud API key and model ID served through Groq
+GROQ_API_KEY=
+GROQ_MODEL=openai/gpt-oss-120b
+```
+
+Start PostgreSQL and confirm that it is ready:
+
+```sh
+docker compose --env-file .env.local up -d postgres
+docker compose --env-file .env.local exec postgres pg_isready -U ledgerlens -d ledgerlens_local
+```
+
+The database files persist in a Docker volume. `docker compose --env-file .env.local down` stops PostgreSQL and keeps the data; `docker compose --env-file .env.local down -v` also deletes the local database volume.
+
+If PostgreSQL is already installed on your computer, create a local database and user yourself, then set both database URLs to that connection with `sslmode=disable`. The `POSTGRES_*` variables are only used by Docker Compose.
+
+#### Option B: Neon PostgreSQL
+
+Create a Neon project and database, then open the project's **Connect** dialog. Select the same branch and database for both connection strings:
+
+- Put the **pooled** connection string in `DATABASE_URL` (application runtime).
+- Put the **direct/unpooled** connection string in `DATABASE_URL_UNPOOLED` (migrations and imports). It must not use a `-pooler` hostname.
+
+Keep the SSL settings supplied by Neon. Do not copy connection strings from different branches or databases. Leave the `POSTGRES_*` variables unused and do not start the Docker database. Continue with step 3; `npm run db:setup` uses the direct URL, and `npm run dev` uses the pooled URL. Use a development branch because the import replaces its finance snapshot.
+
+### 3. Apply migrations and load the supplied data
+
+From the repository root, run:
+
+```sh
+npm run db:setup
+```
+
+This applies the numbered SQL migrations in `db/migrations/`—`001_finance.sql` creates the finance schema and `002_chat_requests.sql` creates shared Assistant request limits—and imports the 14 bundled CSV files from `DDL_Labs_WC_Starter_Data/`. No manual SQL setup is needed. The migration runner records checksums, skips unchanged migrations that were already applied, and stops if an applied migration has been edited.
+
+> **Data warning:** the import replaces the finance snapshot and import-issue records in the database selected by `DATABASE_URL_UNPOOLED`. Re-running `npm run db:setup` reloads the bundled dataset; use a new local database or Neon branch for review, not a database whose finance data you need to preserve.
+
+To run the steps separately, use `npm run migrate` for schema migrations and `npm run import:data` for the bundled CSV import. To import a replacement dataset, provide all 14 CSV files with the same filenames and headers:
+
+```sh
+npm run import:data -- /path/to/csv-directory
+```
+
+`npm run db:reset -- --confirm` permanently deletes the imported finance snapshot and import issues in the database selected by `DATABASE_URL_UNPOOLED`. It does not drop the schema. Review the script and confirm the target database before running it.
+
+### 4. Start the application
+
+```sh
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000). To run a production build locally:
+
+```sh
+npm run build
+npm start
+```
+
+### Environment variables
+
+The tracked [.env.example](.env.example) lists the supported variables. Copy it to `.env.local`, then fill in the values for the database option you chose. Database URLs and provider keys are credentials; never commit them.
+
+| Variable | Required? | What to set and where to get it |
+|---|---|---|
+| `DATABASE_URL` | Yes | Runtime PostgreSQL URL. For local PostgreSQL, build it from your local user, password, host, port and database. For Neon, copy the **pooled** URL from the project's Connect dialog. |
+| `DATABASE_URL_UNPOOLED` | Yes for setup/import/reset | Direct PostgreSQL URL for migrations, imports and reset. For local PostgreSQL, use the same URL as `DATABASE_URL`. For Neon, copy the **direct/unpooled** URL for the same branch and database; do not use a pooler URL. |
+| `POSTGRES_USER` | Docker only | A local database username you choose; Compose passes it to the Postgres container. |
+| `POSTGRES_PASSWORD` | Docker only | A local-only password you choose. Use the same password in both connection URLs; URL-encode special characters there. |
+| `POSTGRES_DB` | Docker only | A local database name you choose. |
+| `POSTGRES_PORT` | Docker only | Host port for local PostgreSQL; defaults to `5432`. If you change it, update both URLs to use the same port. |
+| `GEMINI_API_KEY` | Optional | Credential for the Gemini API; get a key from [Google AI Studio](https://aistudio.google.com/app/apikey). |
+| `GEMINI_MODEL` | Optional | Gemini model ID used with `GEMINI_API_KEY`; defaults to `gemini-flash-lite-latest`. |
+| `GROQ_API_KEY` | Optional | Credential for Groq Cloud (not xAI Grok); get a key from [Groq Console](https://console.groq.com/keys). |
+| `GROQ_MODEL` | Optional | Model ID served through the Groq API with `GROQ_API_KEY`; defaults to `openai/gpt-oss-120b` (GPT-OSS hosted by Groq). |
+| `OPENAI_API_KEY` | Optional | OpenAI API key from [OpenAI Platform](https://platform.openai.com/api-keys); used after Gemini and Groq in automatic fallback. |
+| `TRUST_PROXY_HEADERS` | Usually leave `false` | Set to `true` only when deployed behind a trusted proxy that overwrites forwarded client-IP headers. Vercel is detected automatically. |
+| `VERIFICATION_DATABASE_URL` | Integration checks only | Set in the shell when running `npm run test:integration`. It must point to an isolated local database whose name begins with `ledgerlens_`; remote databases are refused. |
+
+The dashboard and deterministic financial tools do not require AI provider keys. Without an available provider, the Assistant can still handle supported deterministic routes and may ask for clarification when it cannot identify a supported request. For the setup described here, configure Gemini and/or Groq. The code also supports an optional OpenAI fallback; xAI Grok is not integrated. Gemini and Groq keys can also be entered in AI & Model Settings; those user-supplied keys are stored in that browser's localStorage until cleared.
+
+For Vercel, add the runtime database URL and any server-side AI keys in the project's Environment Variables settings. Run migrations/imports separately with the direct database URL; do not configure an automatic deployment step to run `npm run db:setup`, because its importer replaces the finance snapshot.
+
+### Troubleshooting
+
+- **`DATABASE_URL is required`:** set a valid PostgreSQL URL in `.env.local`; restart `npm run dev` after changing it.
+- **Connection refused:** confirm PostgreSQL is running, the mapped port matches both URLs, and the database exists.
+- **Migration/import says to use a direct connection:** set `DATABASE_URL_UNPOOLED` to a direct URL without `-pooler`.
+- **Invalid URL or authentication failure:** confirm username/password/database match the database, and URL-encode reserved characters in credentials.
+- **Assistant has no model-backed answers:** configure at least one provider key, or use the deterministic supported questions.
+
 ## Implemented
 
 - Six live screens: Overview, Receivables, Payables, Exceptions, Actions and Assistant.
@@ -38,33 +167,9 @@ Verified against an isolated PostgreSQL import of the supplied CSVs on 21 Novemb
 
 An exception count is a count of rule observations, not unique transactions or additive financial exposure. Counts change when source data or validated rules change.
 
-## Run locally
-
-Use Node.js 24.x or 26.x and PostgreSQL. The application uses Neon through a pooled URL; migrations/imports use a direct URL. Optional local PostgreSQL is defined in `compose.yaml`.
-
-```sh
-npm ci
-cp .env.example .env.local
-```
-
-Set `DATABASE_URL` and `DATABASE_URL_UNPOOLED` in `.env.local`. For Neon, use the pooled connection for `DATABASE_URL` and the direct connection for `DATABASE_URL_UNPOOLED`, both from the same branch and database. For local PostgreSQL, use the same local connection string for both with `sslmode=disable`. The supplied synthetic CSVs are in `DDL_Labs_WC_Starter_Data/`. Then run:
-
-```sh
-npm run db:setup
-npm run dev
-```
-
-Open http://localhost:3000. For production, run `npm run build` then `npm start`.
-
-`001_finance.sql` creates the source schema. `002_chat_requests.sql` creates the shared request-limit table; **apply both migrations before using Assistant**. The importer atomically replaces the finance source snapshot and import issues; it does not replace operational request-limit records. Never run an import against a database you intend to preserve without reviewing that snapshot-replacement behaviour.
-
-`npm run db:setup` runs migrations followed by an import. Running it again replaces the existing finance snapshot with the CSV files. To use a different dataset, provide all 14 CSVs with the same filenames and headers and run `npm run import:data -- /path/to/csv-directory`. To clear finance data without dropping the schema or chat request records, run `npm run db:reset -- --confirm`. This permanently deletes the imported snapshot and import issues in the database selected by `DATABASE_URL_UNPOOLED`. Run `npm run import:data` to reload the bundled snapshot. Use an isolated database or Neon branch for review.
-
-For optional Docker PostgreSQL, set `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` and optionally `POSTGRES_PORT` in `.env`, run `docker compose up -d postgres`, and point both database URLs at that local instance with `sslmode=disable`. Remote connections enforce certificate verification.
-
 ## AI configuration
 
-Configure `GEMINI_API_KEY`, `GROQ_API_KEY` or `OPENAI_API_KEY` on the server. Default routing order is Gemini, Groq, then OpenAI. Current bundled model defaults are `gemini-flash-lite-latest`, `openai/gpt-oss-120b` and `gpt-4o-mini`. Explicit provider selection uses only that provider; recognized questions can still fall back to deterministic live tools.
+Server-side provider keys are optional. Automatic routing tries Gemini, then Groq, then the optional OpenAI fallback. OpenAI uses `gpt-4o-mini`; Gemini and Groq model defaults are listed in the environment variable table. Explicit provider selection uses only that provider; recognized questions can still fall back to deterministic live tools.
 
 AI Config also accepts user-supplied Gemini/Groq keys and retrieves account model catalogs through server-side POST requests. Saved keys persist in this browser's localStorage until cleared. Catalog visibility is not proof of completion/tool-calling access or available quota. Credentials are not included in source code or application logs.
 
@@ -108,17 +213,22 @@ Formal DSO/DPO and full CCC are unavailable without the required net credit sale
 ```sh
 npm run typecheck
 npm run lint
-npm run build
 npm test
+npm run build
 ```
 
-`npm test` passes 27 CSV arithmetic assertions only. The Webpack production build passes with `npm run build -- --webpack`; this execution host blocks Turbopack's local worker port. For isolated database and mocked-provider integration checks, create an isolated local database with a name beginning `ledgerlens_`, apply migrations and import the starter CSVs there, then:
+`npm test` runs 27 CSV arithmetic assertions and does not require a database. The production build is `npm run build`; if your environment blocks Turbopack's local worker port, `npm run build -- --webpack` is a validated alternative.
+
+The integration suite uses a separate local database whose name begins with `ledgerlens_`. With the Docker setup above, create and prepare one as follows (replace the username, password and port if you changed the example values):
 
 ```sh
-VERIFICATION_DATABASE_URL='postgresql://USER:PASSWORD@127.0.0.1:5432/ledgerlens_verify?sslmode=disable' npm run test:integration
+docker compose --env-file .env.local exec postgres createdb -U ledgerlens ledgerlens_verify
+export VERIFICATION_DATABASE_URL='postgresql://ledgerlens:replace_with_a_local_password@127.0.0.1:5432/ledgerlens_verify?sslmode=disable'
+DATABASE_URL_UNPOOLED="$VERIFICATION_DATABASE_URL" npm run db:setup
+npm run test:integration
 ```
 
-The integration runner refuses remote/nonverification databases. Adversarial finance fixtures roll back. Operational rate-limit records are cleared in that isolated database. No paid model calls occur: provider responses are mocked. The suite verifies independent CSV totals, historical/daily bridges, exact large amounts, missing data, source conflicts, six scenario routes, follow-up scope, provider failures, in-flight cancellation, reference grounding and limits. Project rules require explicit approval before running tests or browser checks.
+`VERIFICATION_DATABASE_URL` must be set in the shell for the integration command; it must point to `localhost` and a database named `ledgerlens_*`. The runner refuses remote or other databases. Run it only against a disposable verification database: test fixtures roll back, but operational rate-limit records in that database are cleared. Provider responses are mocked, so no paid model calls occur. The suite covers independent CSV totals, historical/daily bridges, exact large amounts, missing data, source conflicts, six scenario routes, follow-up scope, provider failures, cancellation, reference grounding and limits.
 
 ## Documentation and delivery
 
